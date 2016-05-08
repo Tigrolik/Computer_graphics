@@ -1,0 +1,28 @@
+This is a series of exercises done while going through the short course of
+computer graphics: https://github.com/ssloy/tinyrenderer/wiki
+
+The model used only for learning/educational/training purposes and is the same
+as in the course (sometimes referred as original source).
+
+The approach implemented in the codes differs from the original source, however,
+does not pretend to be a replacement or improvement, but rather used for
+learning purposes and demonstration of another way of doing things.
+
+Few differences are:
+    1. Instead of TGA images I am using PPM images. The reasons:
+       - Make a simple image class (PPM was easier to implement)
+       - Create own C++ classes and set of routines to learn not only computer
+         graphic but C++ as well
+       Only RGB version is used which seems to be enough (RGBA, GRAY and BW can
+       be implemented later), after all, the main goal is not to learn how to
+       read/write images in C++;
+    2. The Geometry class is NOT the same as in the original source and shows
+       the hierarchy of geometrical primitives (shapes) which can be put (drawn)
+       onto a PPM image;
+    3. Implementation of original geometry and model classes is done in a single
+       class called Model. The exercises show various ways of implementing this
+       class.
+
+The exercises are divided into chapters loosely following the original source
+articles structure and implementations of classes vary.
+
