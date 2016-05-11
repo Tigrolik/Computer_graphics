@@ -1,6 +1,5 @@
 /*
- * The purpose of this exercise is to be able to draw a single dot on the image.
- * I am not creating any fancy graphics, but starting from the basics
+ * The purpose of this exercise is to be able to draw lines and circles
  *
  * Added:
  *      Cohen–Sutherland line clipping algorithm: clip the line so that the
