@@ -16,6 +16,7 @@
  *      - Cohen–Sutherland line clipping algorithm: clip the line so that the
  *      coordinates beyond image are not processed
  *      - Circle class
+ *      - Half-space filling algorithm for triangle
  */
 
 #ifndef _GEOMETRY_H_
@@ -94,6 +95,7 @@ public:
     double area() const override;
     void draw(PPM_Image&, const PPM_Color& = 255) const override;
     void fill(PPM_Image&, const PPM_Color& = 255) const override;
+    void fill_hs(PPM_Image&, const PPM_Color& = 255) const;
 
 private:
     Point p1_;

@@ -282,11 +282,50 @@ void test_lenght_n_area() {
         c1.area() << '\n';
 }
 
+void test_filling_tri() {
+    constexpr int w {600}, h {400};
+    PPM_Image I {w, h};
+
+    using namespace std::chrono;
+    const size_t n {1000}; // number of reps for testing
+
+    const Triangle t1 {{10, 10}, {10, 30}, {45, 10}};
+    const Triangle t2 {{50, 50}, {590, 30}, {40, 390}};
+    const Triangle t3 {{595, 70}, {595, 370}, {90, 395}};
+
+    std::cout << "Testing Triangle.fill()\n";
+    auto t = high_resolution_clock::now();
+    for (size_t i {n}; i--;) {
+        t1.fill(I, Color_name::red);
+        t2.fill(I, Color_name::green);
+        t3.fill(I, Color_name::blue);
+    }
+    std::cout << duration<double>(high_resolution_clock::now() - t).count() <<
+        " seconds\n";
+
+    std::cout << "Testing Triangle.fill_halfs():\n";
+    t = high_resolution_clock::now();
+    for (size_t i {n}; i--;) {
+        t1.fill_hs(I, Color_name::red);
+        t2.fill_hs(I, Color_name::green);
+        t3.fill_hs(I, Color_name::blue);
+    }
+    std::cout << duration<double>(high_resolution_clock::now() - t).count() <<
+        " seconds\n";
+
+    t1.draw(I, Color_name::yellow);
+    t2.draw(I, Color_name::yellow);
+    t3.draw(I, Color_name::yellow);
+
+    I.write_to("tri.ppm");
+}
+
 int main() {
 
-    //test_lines();
+    test_lines();
     test_circles();
-    //test_lenght_n_area();
+    test_lenght_n_area();
+    test_filling_tri();
 
     return 0;
 }

@@ -82,7 +82,7 @@ bool clip_line(int &x1, int &y1, int &x2, int &y2,
             return false;
         else {
             const int code {code1 ? code1 : code2};
-            double x, y;
+            double x {}, y {};
             if (code & top) {
                 x = x1 + (x2 - x1) * static_cast<double>(ymin - y1) / (y2 - y1);
                 y = ymin;
@@ -177,10 +177,12 @@ void Triangle::draw(PPM_Image &I, const PPM_Color &c) const {
     Line{p3_, p1_}.draw(I, c);
 }
 
+/*
+ * standard filling algorithm
+ */
 void Triangle::fill(PPM_Image &I, const PPM_Color &c) const {
     Point p1 {p1_}, p2 {p2_}, p3 {p3_};
-    if (p1.y() == p2.y() && p2.y() == p3.y()) // ignore dots
-        return;
+    if (p1.y() == p2.y() && p2.y() == p3.y()) return;
     // sort the vertices
     if (p1.y() > p2.y()) std::swap(p1, p2);
     if (p1.y() > p3.y()) std::swap(p1, p3);
@@ -202,6 +204,77 @@ void Triangle::fill(PPM_Image &I, const PPM_Color &c) const {
         const int y_cur {y1 + y};
         for (int x {xa}; x <= xb; ++x)
             I[x][y_cur] = clr;
+    }
+}
+
+/*
+ * half space algorithm for filling triangle
+ * with no optimization compiler options this method is just slightly slower
+ * than the standard algorithm. With option 03 turned on, this method becomes
+ * faster.
+ * This implementation uses a lot of auxilliary variables
+ */
+void Triangle::fill_hs(PPM_Image &I, const PPM_Color &C) const {
+    int y1 {p1_.y()}, y2 {p2_.y()}, y3 {p3_.y()};
+    if (y1 == y2 && y1 == y3) return;
+    int x1 {p1_.x()}, x2 {p2_.x()}, x3 {p3_.x()}, w = I.width(), h = I.height();
+    if (y1 > y2) {std::swap(y1, y2); std::swap(x1, x2); }
+    if (y1 > y3) {std::swap(y1, y3); std::swap(x1, x3); }
+    if (y2 > y3) {std::swap(y2, y3); std::swap(x2, x3); }
+    const int xmax {std::min(w, std::max(std::max(std::max(x1, x2), x3), 0))};
+    const int ymax {std::min(h, std::max(y3, 0))};
+    int xmin {std::min(w, std::max(std::min(std::min(x1, x2), x3), 0))};
+    int ymin {std::min(h, std::max(y1, 0))};
+    if (xmax < 0 || ymax < 0 || xmin >= w || ymin >= h) return;
+    if ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1) < 0) {
+        std::swap(x1, x3); std::swap(y1, y3);
+    }
+    //if (x2 > x1) { std::swap(x1, x3); std::swap(y1, y3); }
+    static constexpr int q {8}, q1 {q - 1};
+    xmin &= ~(q - 1); ymin &= ~(q - 1); // start in corner of qxq block
+    const int dx12 {x1 - x2}, dx23 {x2 - x3}, dx31 {x3 - x1};
+    const int dy12 {y1 - y2}, dy23 {y2 - y3}, dy31 {y3 - y1};
+    int C1 {dy12 * x1 - dx12 * y1}, C2 {dy23 * x2 - dx23 * y2},
+        C3 {dy31 * x3 - dx31 * y3};
+    if (dy12 < 0 || (dy12 == 0 && dx12 > 0)) ++C1;
+    if (dy23 < 0 || (dy23 == 0 && dx23 > 0)) ++C2;
+    if (dy31 < 0 || (dy31 == 0 && dx31 > 0)) ++C3;
+    const uint clr {C.color()};
+    for (int y {ymin}; y < ymax; y += q) {
+        const int yt0 {y}, yt1 {y + q1}, ytq {y + q};
+        const int at0 {C1 + dx12 * yt0}, at1 {C1 + dx12 * yt1};
+        const int bt0 {C2 + dx23 * yt0}, bt1 {C2 + dx23 * yt1};
+        const int ct0 {C3 + dx31 * yt0}, ct1 {C3 + dx31 * yt1};
+        for (int x {xmin}; x < xmax; x += q) {
+            const int xt0 {x}, xt1 {x + q1};
+            const int ax0 {dy12 * xt0}, ax1 {dy12 * xt1};
+            const int a = (at0 - ax0 > 0) | ((at0 - ax1 > 0) << 1) |
+                ((at1 - ax0 > 0) << 2) | ((at1 - ax1 > 0) << 3);
+            const int bx0 {dy23 * xt0}, bx1 {dy23 * xt1};
+            const int b = (bt0 - bx0 > 0) | ((bt0 - bx1 > 0) << 1) |
+                ((bt1 - bx0 > 0) << 2) | ((bt1 - bx1 > 0) << 3);
+            const int cx0 {dy31 * xt0}, cx1 {dy31 * xt1};
+            const int c = (ct0 - cx0 > 0) | ((ct0 - cx1 > 0) << 1) |
+                ((ct1 - cx0 > 0) << 2) | ((ct1 - cx1 > 0) << 3);
+            if (a == 0x0 || b == 0x0 || c == 0x0) continue;
+            const int xtq {x + q};
+            if (a == 0xF && b == 0xF && c == 0xF) {
+                for (int iy {y}; iy < ytq; ++iy)
+                    for (int ix {x}; ix < xtq; ++ix)
+                        I[ix][iy] = clr;
+            } else {
+                int Cy1 {at0 - ax0}, Cy2 {bt0 - bx0}, Cy3 {ct0 - cx0};
+                for (int iy {y}; iy < ytq; ++iy) {
+                    int Cx1 {Cy1}, Cx2 {Cy2}, Cx3 {Cy3};
+                    for (int ix {x}; ix < xtq; ++ix) {
+                        if (Cx1 > 0 && Cx2 > 0 && Cx3 > 0)
+                            I[ix][iy] = clr;
+                        Cx1 -= dy12; Cx2 -= dy23; Cx3 -= dy31;
+                    }
+                    Cy1 += dx12; Cy2 += dx23; Cy3 += dx31;
+                }
+            }
+        }
     }
 }
 
