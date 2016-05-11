@@ -1,8 +1,10 @@
 This is a series of exercises done while going through the short course of
 computer graphics: https://github.com/ssloy/tinyrenderer/wiki
+The codes are created in C++ only and in Linux environment. They might compile
+and run in other OSs, but I do not promise that :)
 
-The model used only for learning/educational/training purposes and is the same
-as in the course (sometimes referred as original source).
+The 3D model used only for learning/educational/training purposes and is the
+same as in the course (sometimes referred as original source).
 
 The approach implemented in the codes differs from the original source, however,
 does not pretend to be a replacement or improvement, but rather used for

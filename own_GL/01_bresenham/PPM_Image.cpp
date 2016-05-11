@@ -120,6 +120,7 @@ void write_ppm_image(const PPM_Image &img, const std::string &fn) {
     std::ofstream ofs {fn, std::ios_base::binary};
     ofs.exceptions(ofs.exceptions() | std::ios_base::badbit);
     ofs << img;
+    std::cout << "The result is saved to file: " << fn << '\n';
 }
 
 void PPM_Image::pixel_color(int x, int y, const PPM_Color &c) {

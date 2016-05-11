@@ -148,6 +148,7 @@ void PPM_Image::write_to(const std::string &fn) {
             const uint c = vals_[x][y];
             ofs << red(c) << green(c) << blue(c);
         }
+    std::cout << "The result is saved to file: " << fn << '\n';
 }
 
 // helper function: skip commment lines in the header of ppm image
