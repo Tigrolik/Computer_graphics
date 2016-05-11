@@ -1,0 +1,10 @@
+This collection of codes is done while learning basics of computer graphics.
+The main idea I have tried to follow is to use only basic C++ facilities, std::
+libraries.
+I am not using OpenGL, but rather writing the results to images in format PPM
+which makes it less comfortable to observe the results (it is necessary to open
+the image in some viewer after running the program to see the result). However,
+it also allows for better understanding of the process.
+The codes are created in C++ only and in Linux environment. They might compile
+and run in other OSs, but I do not promise that :)
+
