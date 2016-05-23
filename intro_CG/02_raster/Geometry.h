@@ -50,12 +50,13 @@ class Point; // forward declaration
 
 class Shape {
 public:
-    //virtual double length() const = 0; // length, perimeter...
-    //virtual double area() const = 0;
     virtual double length() const { return 0; } // length, perimeter...
     virtual double area() const { return 0; }
-    virtual void draw(PPM_Image&, const PPM_Color&) const = 0;
-    virtual void fill(PPM_Image&, const PPM_Color&) const = 0;
+    void draw(PPM_Image &I, const PPM_Color &c = 255) const { doDraw(I, c); }
+    void fill(PPM_Image &I, const PPM_Color &c = 255) const { doFill(I, c); }
+private:
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const = 0;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const = 0;
 };
 
 class Point: public Shape {
@@ -90,12 +91,12 @@ public:
     constexpr double dist_to(const Point &o) const {
         return sqrt(sqr(x_ - o.x_) + sqr(y_ - o.y_));
     }
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
 
 private:
     int x_;
     int y_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Point_array: public Shape {
@@ -135,28 +136,51 @@ public:
     size_t size() const { return pa_.size(); }
     const std::vector<Point>& points() const { return pa_; }
 
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
 protected:
     std::vector<Point> pa_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Line: public Shape {
 public:
-    Line(const Point&, const Point&);
-    Line(const Point&, const int, const int);
-    Line(const int, const int, const int, const int);
-    Line(const Line&);
+    constexpr Line(const Point &p1, const Point &p2): p1_{p1}, p2_{p2} { }
+    constexpr Line(const Point &pp, const int xx, const int yy):
+        p1_{pp}, p2_{Point{xx, yy}} { }
+    constexpr Line(const int x1, const int y1, const int x2, const int y2):
+        p1_{Point{x1, y1}}, p2_{Point{x2, y2}} { }
+    constexpr Line(const Line &o): p1_{o.p1_}, p2_{o.p2_} { }
     Line& operator=(const Line&);
     ~Line() = default;
 
-    double length() const override { return p1_.dist_to(p2_); }
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
+    constexpr double length() const override { return p1_.dist_to(p2_); }
 
 private:
     Point p1_;
     Point p2_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
+};
+
+class Rectangle: public Shape {
+public:
+    constexpr Rectangle(const Point &pp, const size_t ww, const size_t hh):
+        p_{pp}, w_{ww}, h_{hh} { }
+    constexpr Rectangle(const int xx, const int yy,const size_t ww,
+            const size_t hh): p_{Point{xx, yy}}, w_{ww}, h_{hh} { }
+    constexpr Rectangle(const Rectangle &o): p_{o.p_}, w_{o.w_}, h_{o.h_} { }
+    Rectangle& operator=(const Rectangle&);
+    ~Rectangle() = default;
+
+    constexpr double length() const override { return (w_ + h_) << 1; }
+    constexpr double area() const override { return w_ * h_; }
+
+private:
+    Point p_;
+    size_t w_;
+    size_t h_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Polyline: public Point_array {
@@ -169,8 +193,9 @@ public:
 
     double length() const override;
 
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
+private:
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Triangle: public Shape {
@@ -183,14 +208,15 @@ public:
 
     double length() const override;
     double area() const override;
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
+
     void fill_hs(PPM_Image&, const PPM_Color& = 255) const;
 
 private:
     Point p1_;
     Point p2_;
     Point p3_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Polygon: public Polyline {
@@ -204,8 +230,9 @@ public:
     double length() const override;
     double area() const override;
 
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
+private:
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
 
 class Circle: public Shape {
@@ -218,14 +245,13 @@ public:
 
     double length() const override { return pi * (r_ << 1); }
     double area() const override { return pi * sqr(r_); }
-    void draw(PPM_Image&, const PPM_Color& = 255) const override;
-    void fill(PPM_Image&, const PPM_Color& = 255) const override;
 
 private:
     Point p_;
     size_t r_;
+    virtual void doDraw(PPM_Image&, const PPM_Color&) const override;
+    virtual void doFill(PPM_Image&, const PPM_Color&) const override;
 };
-
 
 #endif
 

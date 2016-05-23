@@ -8,12 +8,14 @@ Point& Point::operator=(const Point &o) {
     if (this != &o) { x_ = o.getX(); y_ = o.getY(); } return *this;
 }
 
-void Point::draw(PPM_Image &I, const PPM_Color &c) const {
+void Point::doDraw(PPM_Image &I, const PPM_Color &c) const {
     if (x_ >= 0 && x_ < I.width() && y_ >= 0 && y_ < I.height())
         I[x_][y_] = c.color();
 }
 
-void Point::fill(PPM_Image &I, const PPM_Color &c) const { Point::draw(I, c); }
+void Point::doFill(PPM_Image &I, const PPM_Color &c) const {
+    Point::draw(I, c);
+}
 
 /*
  * ------------------ Point_array implementation ------------------
@@ -44,31 +46,17 @@ Point_array& Point_array::operator=(Point_array &&o) {
     return *this;
 }
 
-void Point_array::draw(PPM_Image &I, const PPM_Color &c) const {
+void Point_array::doDraw(PPM_Image &I, const PPM_Color &c) const {
     for (const auto &p: pa_) p.draw(I, c);
 }
 
-void Point_array::fill(PPM_Image &I, const PPM_Color &c) const {
+void Point_array::doFill(PPM_Image &I, const PPM_Color &c) const {
     Point_array::draw(I, c);
 }
 
 /*
  * ------------------ Line implementation ------------------
  */
-Line::Line(const Point &p1, const Point &p2): p1_{p1}, p2_{p2} {
-}
-
-Line::Line(const Point &p, const int xx, const int yy):
-    p1_{p}, p2_{Point{xx, yy}} {
-}
-
-Line::Line(const int x1, const int y1, const int x2, const int y2):
-    p1_{Point{x1, y1}}, p2_{Point{x2, y2}} {
-    }
-
-Line::Line(const Line &o): p1_{o.p1_}, p2_{o.p2_} {
-}
-
 Line& Line::operator=(const Line &o) {
     if (this != &o) {
         p1_ = o.p1_;
@@ -141,7 +129,7 @@ bool clip_line(int &x1, int &y1, int &x2, int &y2,
 /*
  * Bresenham algorithm for drawing line points
  */
-void Line::draw(PPM_Image &I, const PPM_Color &c) const {
+void Line::doDraw(PPM_Image &I, const PPM_Color &c) const {
     int x1 {p1_.x()}, y1 {p1_.y()}, x2 {p2_.x()}, y2 {p2_.y()};
     // clip the line if needed
     if (!clip_line(x1, y1, x2, y2, 0, I.width(), 0, I.height()))
@@ -161,8 +149,58 @@ void Line::draw(PPM_Image &I, const PPM_Color &c) const {
     }
 }
 
-void Line::fill(PPM_Image &I, const PPM_Color &c) const {
+void Line::doFill(PPM_Image &I, const PPM_Color &c) const {
     Line::draw(I, c);
+}
+
+/*
+ * ------------------ Rectangle implementation ------------------
+ */
+Rectangle& Rectangle::operator=(const Rectangle &o) {
+    if (this != &o) {
+        p_ = o.p_;
+        w_ = o.w_;
+        h_ = o.h_;
+    }
+    return *this;
+}
+
+void Rectangle::doDraw(PPM_Image &I, const PPM_Color &c) const {
+    const int x1 = p_.x(), x2 = x1 + w_, y1 = p_.y(), y2 = y1 + h_;
+    const int w {I.width()}, h {I.height()};
+    const int xmin {std::min(std::max(0, x1), w)};
+    const int xmax {std::min(std::max(0, x2), w)};
+    const int ymin {std::min(std::max(0, y1), h)};
+    const int ymax {std::min(std::max(0, y2), h)};
+    const uint clr {c.color()};
+    if (y1 >= 0 && y1 < h) {
+        if (y2 >= 0 && y2 < h)
+            for (auto x = xmin; x < xmax; ++x) {
+                I[x][y1] = clr;
+                I[x][y2] = clr;
+            }
+        else for (auto x = xmin; x < xmax; ++x) I[x][y1] = clr;
+    }
+    if (x1 >= 0 && x1 < w) {
+        if (x2 >= 0 && x2 < w)
+            for (auto y = ymin; y < ymax; ++y) {
+                I[x1][y] = clr;
+                I[x2][y] = clr;
+            }
+        else for (auto y = ymin; y < ymax; ++y) I[x1][y] = clr;
+    }
+}
+
+void Rectangle::doFill(PPM_Image &I, const PPM_Color &c) const {
+    const int w {I.width()}, h {I.height()};
+    const int x1 = p_.x(), y1 = p_.y();
+    const int xmin {std::min(std::max(0, x1), w)};
+    const int xmax {std::min(std::max(0, x1 + int(w_)), w)};
+    const uint clr {c.color()};
+    for (auto y = std::min(std::max(0, y1), h);
+            y < std::min(std::max(0, y1 + int(h_)), h); ++y)
+        for (auto x = xmin; x < xmax; ++x)
+            I[x][y] = clr;
 }
 
 /*
@@ -174,12 +212,12 @@ double Polyline::length() const {
     return d;
 }
 
-void Polyline::draw(PPM_Image &I, const PPM_Color &c) const {
+void Polyline::doDraw(PPM_Image &I, const PPM_Color &c) const {
     for (size_t i {0}; i < size() - 1; ++i)
         Line{pa_[i], pa_[i+ 1]}.draw(I, c);
 }
 
-void Polyline::fill(PPM_Image &I, const PPM_Color &c) const {
+void Polyline::doFill(PPM_Image &I, const PPM_Color &c) const {
     Polyline::draw(I, c);
 }
 
@@ -216,7 +254,7 @@ double Triangle::area() const {
         (p3_.x() - p1_.x()) * (p2_.y() - p1_.y())) * 0.5;
 }
 
-void Triangle::draw(PPM_Image &I, const PPM_Color &c) const {
+void Triangle::doDraw(PPM_Image &I, const PPM_Color &c) const {
     Line{p1_, p2_}.draw(I, c);
     Line{p2_, p3_}.draw(I, c);
     Line{p3_, p1_}.draw(I, c);
@@ -225,7 +263,7 @@ void Triangle::draw(PPM_Image &I, const PPM_Color &c) const {
 /*
  * standard filling algorithm
  */
-void Triangle::fill(PPM_Image &I, const PPM_Color &c) const {
+void Triangle::doFill(PPM_Image &I, const PPM_Color &c) const {
     Point p1 {p1_}, p2 {p2_}, p3 {p3_};
     if (p1.y() == p2.y() && p2.y() == p3.y()) return;
     // sort the vertices
@@ -341,14 +379,42 @@ double Polygon::area() const {
     return d >= 0 ? d * 0.5 : -d * 0.5;
 }
 
-void Polygon::draw(PPM_Image &I, const PPM_Color &c) const {
-    for (size_t i {0}; i < size() - 1; ++i)
-        Line{operator[](i), operator[](i + 1)}.draw(I, c);
-    Line{operator[](size() - 1), operator[](0)}.draw(I, c);
+void Polygon::doDraw(PPM_Image &I, const PPM_Color &c) const {
+    const size_t n {size() - 1};
+    for (size_t i {0}; i < n; ++i)
+        Line{pa_[i], pa_[i + 1]}.draw(I, c);
+    if (n > 1) Line{pa_[n], pa_[0]}.draw(I, c);
 }
 
-void Polygon::fill(PPM_Image &I, const PPM_Color &c) const {
-    Polygon::draw(I, c);
+// fill the polygon using scanline algo
+void Polygon::doFill(PPM_Image &I, const PPM_Color &c) const {
+    const size_t n {size()};
+    if (n < 1) return;
+    int ymin {pa_[0].y()}, ymax {ymin};
+    for (size_t i {1}; i < n; ++i) {
+        const int y {pa_[i].y()};
+        if (y < ymin) ymin = y;
+        else if (y > ymax) ymax = y;
+    }
+    // building a vector of nodes, sorting them and filling the pixels
+    const int w {I.width()}, h {I.height()};
+    for (auto y = std::min(std::max(0, ymin), h);
+            y < std::min(std::max(0, ymax), h); ++y) {
+        std::vector<int> nodes;
+        for (size_t i {0}, j {n - 1}; i < n; j = i++) {
+            const int yi {pa_[i].y()}, yj {pa_[j].y()};
+            if ((yi < y && yj >= y) || (yj < y && yi >= y)) {
+                const int xi {pa_[i].x()};
+                nodes.push_back(xi + (double(y) - yi) / (yj - yi) *
+                        (pa_[j].x()- xi));
+            }
+        }
+        std::sort(std::begin(nodes), std::end(nodes));
+        for (size_t i {0}; i < nodes.size(); i += 2)
+            for (auto x = std::min(std::max(0, nodes[i]), w);
+                    x < std::min(std::max(0, nodes[i + 1]), w); ++x)
+                I[x][y] = c.color();
+    }
 }
 
 /*
@@ -373,7 +439,7 @@ Circle& Circle::operator=(const Circle &o) {
 /*
  * Bresenham algorithm for drawing circle points
  */
-void Circle::draw(PPM_Image &I, const PPM_Color &c) const {
+void Circle::doDraw(PPM_Image &I, const PPM_Color &c) const {
     const int xc {p_.x()}, yc {p_.y()};
     int x {0}, y = r_, f  = 1 - r_;
     while (x <= y) {
@@ -387,7 +453,7 @@ void Circle::draw(PPM_Image &I, const PPM_Color &c) const {
     I.set_color(xc + r_, yc, c); I.set_color(xc - r_, yc, c);
 }
 
-void Circle::fill(PPM_Image &I, const PPM_Color &c) const {
+void Circle::doFill(PPM_Image &I, const PPM_Color &c) const {
     const int xc {p_.x()}, yc {p_.y()};
     int x {0}, y = r_, f  = 1 - r_;
     while (x <= y) {

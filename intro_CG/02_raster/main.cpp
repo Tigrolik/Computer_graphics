@@ -226,7 +226,7 @@ void test_circles() {
 
     using namespace std::chrono;
     // measure time
-    const size_t n {1000}; // number of reps for testing
+    const size_t n {10}; // number of reps for testing
 
     std::cout << "Testing drawcircle_bresenham():\t\twhite color\n";
     auto t = high_resolution_clock::now();
@@ -286,7 +286,7 @@ void test_filling_tri() {
     PPM_Image I {w, h};
 
     using namespace std::chrono;
-    const size_t n {1000}; // number of reps for testing
+    const size_t n {10}; // number of reps for testing
 
     const Triangle t1 {{10, 10}, {10, 30}, {45, 10}};
     const Triangle t2 {{50, 50}, {590, 30}, {40, 390}};
@@ -379,7 +379,7 @@ bool is_in_poly(const Point p, const Polygon &pg) {
     return res;
 }
 
-void fill_poly_liq(PPM_Image &I, const Polygon &pg, const PPM_Color &c) {
+void fill_poly_scan(PPM_Image &I, const Polygon &pg, const PPM_Color &c) {
     const size_t n {pg.size()};
     if (n < 1) return;
     int ymin {pg[0].y()}, ymax {ymin};
@@ -424,7 +424,7 @@ void test_poly() {
     std::cout << (is_in_poly(p1, pg1) ? "inside\n" : "outside\n");
     std::cout << (is_in_poly(p2, pg1) ? "inside\n" : "outside\n");
     std::cout << (is_in_poly(p3, pg1) ? "inside\n" : "outside\n");
-    fill_poly_liq(I, pg1, Color_name::yellow);
+    fill_poly_scan(I, pg1, Color_name::yellow);
 
     I.write_to("poly.ppm");
 }
@@ -434,11 +434,11 @@ void test_fill_poly() {
     PPM_Image I {w, h};
 
     const Polygon pg1 {{-10, 30}, {70, -10}, {90, 60}, {-30, 80}};
-    fill_poly_liq(I, pg1, PPM_Color{255, 160, 125});
+    fill_poly_scan(I, pg1, PPM_Color{255, 160, 125});
     pg1.draw(I, PPM_Color{53, 216, 185});
 
     const Polygon pg2 {{500, 10}, {610, -50}, {700, -5}, {590, 70}, {550, 60}};
-    fill_poly_liq(I, pg2, PPM_Color{195, 83, 216});
+    fill_poly_scan(I, pg2, PPM_Color{195, 83, 216});
     pg2.draw(I, PPM_Color{142, 216, 52});
 
     Polygon pg3 {{100, 80}, {120, 40}, {200, 10}, {350, 75}, {310, 85}};
@@ -447,27 +447,42 @@ void test_fill_poly() {
     pg3.push_back({215, 85}); pg3.push_back({235, 35});
     pg3.push_back({165, 30}); pg3.push_back({150, 80});
     pg3.push_back({135, 95}); pg3.push_back({115, 100});
-    fill_poly_liq(I, pg3, PPM_Color{60, 90, 255});
+    fill_poly_scan(I, pg3, PPM_Color{60, 90, 255});
     pg3.draw(I, PPM_Color{216, 174, 52});
 
     Polygon pg4 {{50, 300}, {80, 200}, {140, 200}, {140, 330}, {100, 330},
         {90, 270}, {130, 245}, {125, 210}, {110, 205}, {115, 315}};
-    fill_poly_liq(I, pg4, PPM_Color{8, 216, 82});
+    //fill_poly_scan(I, pg4, PPM_Color{8, 216, 82});
+    pg4.fill(I, PPM_Color{8, 216, 82});
     pg4.draw(I, PPM_Color{216, 35, 28});
 
     I.write_to("filled_polygons.ppm");
 }
 
+void test_rect() {
+    constexpr int w {600}, h {400};
+    PPM_Image I {w, h};
+    Rectangle rect1 {{100, 100}, 200, 50};
+    rect1.fill(I, Color_name::cyan);
+    rect1.draw(I, Color_name::red);
+    Rectangle rect2 {{-10, 300}, 500, 150};
+    rect2.fill(I, Color_name::magenta);
+    rect2.draw(I, Color_name::green);
+
+    I.write_to("rect.ppm");
+}
+
 int main() {
 
-    //test_lines();
-    //test_circles();
-    //test_lenght_n_area();
-    //test_filling_tri();
-    //test_point_array();
-    //test_random();
-    //test_poly();
+    test_lines();
+    test_circles();
+    test_lenght_n_area();
+    test_filling_tri();
+    test_point_array();
+    test_random();
+    test_poly();
     test_fill_poly();
+    test_rect();
 
     return 0;
 }
