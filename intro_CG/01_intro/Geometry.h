@@ -25,34 +25,38 @@ constexpr T sqr(const T val) {
     return val * val;
 }
 
-class Point {
+class Point; // forward declaration
+
+class Shape {
 public:
-    Point();
-    Point(const int, const int);
-    Point(const double, const double);
-    Point(const Point&);
+    virtual double length() const { return 0; } // length, perimeter...
+    virtual double area() const { return 0; }
+    virtual void draw(PPM_Image&, const PPM_Color&) const = 0;
+    virtual void fill(PPM_Image&, const PPM_Color&) const = 0;
+};
+
+class Point: public Shape {
+public:
+    constexpr Point(): x_{0}, y_{0} { }
+    constexpr Point(const int xx, const int yy): x_{xx}, y_{yy} { }
+    constexpr Point(const double xd, const double yd): x_(xd), y_(yd) { }
+    constexpr Point(const Point &o): x_{o.x()}, y_{o.y()} { }
     Point &operator=(const Point&);
 
     ~Point() = default;
 
-    int x() const { return x_; }
-    int y() const { return y_; }
+    constexpr int x() const { return x_; }
+    constexpr int y() const { return y_; }
 
-    double dist_to(const Point &o) const { return sqrt(sqr(x_ - o.x_) +
-            sqr(y_ - o.y_)); }
-    void draw(PPM_Image&, const PPM_Color& = 255) const;
+    constexpr double dist_to(const Point &o) const {
+        return sqrt(sqr(x_ - o.x_) + sqr(y_ - o.y_));
+    }
+    void draw(PPM_Image&, const PPM_Color& = 255) const override;
+    void fill(PPM_Image&, const PPM_Color& = 255) const override;
 
 private:
     int x_;
     int y_;
-};
-
-class Shape {
-public:
-    virtual double length() const = 0; // length, perimeter...
-    virtual double area() const = 0;
-    virtual void draw(PPM_Image&, const PPM_Color&) const = 0;
-    virtual void fill(PPM_Image&, const PPM_Color&) const = 0;
 };
 
 class Line: public Shape {

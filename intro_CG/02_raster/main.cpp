@@ -319,12 +319,155 @@ void test_filling_tri() {
     I.write_to("tri.ppm");
 }
 
+void test_point_array() {
+    constexpr int w {600}, h {400};
+    PPM_Image I {w, h};
+    //constexpr Point p1 {10, 10}, p2 {100, 250}, p3 {530, 150};
+    //std::vector<Point> vp {p1, p2, p3};
+    Point_array pa {{10, 10}, {100, 250}, {530, 150}};
+    pa.push_back({300, 10});
+    Point_array pa2 {std::move(pa)};
+    pa2.fill(I, Color_name::yellow);
+    Polyline pl1 {pa2.points()};
+    Polygon pg1 {pl1.points()};
+    std::cout << pg1.length() << ' ' << pl1.length() << '\n';
+    std::cout << pg1.area() << ' ' << pl1.area() << '\n';
+    Polygon pg2 {{50, 10}, {10, 139}, {153, 30}};
+    Triangle t1 {{50, 10}, {153, 30}, {10, 139}};
+    std::cout << pg2.area() << ' ' << t1.area() << '\n';
+    Polygon pg3 {{450, 250}, {450, 350}, {550, 350}, {550, 250}, {500, 300}};
+    std::cout << pg3.area() << '\n';
+    pg3.draw(I, Color_name::red);
+    pg1.draw(I, Color_name::red);
+    pl1.push_back({500, 100});
+    Polyline pl2 {std::move(pl1)};
+    pl2.draw(I, Color_name::green);
+    Polyline pl3 = pl2;
+    pl3.fill(I, Color_name::cyan);
+    pg2.draw(I, Color_name::green);
+    I.write_to("dots.ppm");
+}
+
+void test_random() {
+    constexpr int w {600}, h {400}, wc {w >> 1}, hc {h >> 1};
+    PPM_Image I {w, h};
+    constexpr size_t n {20};
+    auto gen = std::bind(std::normal_distribution<double> {n, 4.0},
+            std::default_random_engine {});
+    std::vector<int> hist (n << 1);
+    for (size_t i {0}; i < 1000; ++i)
+        ++hist[int(round(gen()))];
+    Point_array pa;
+    for (size_t i {0}; i < hist.size(); ++i)
+        pa.push_back({int(i + wc - n), hc - hist[i]});
+    Polyline pl {pa.points()};
+    pl.draw(I, Color_name::yellow);
+    pa.draw(I, Color_name::red);
+
+    I.write_to("normal_dist.ppm");
+}
+
+bool is_in_poly(const Point p, const Polygon &pg) {
+    bool res {false};
+    const int x {p.x()}, y {p.y()};
+    for (size_t i {0}, j {pg.size() - 1}; i < pg.size(); j = i++) {
+        const Point pgi {pg[i]}, pgj {pg[j]};
+        const int xi {pgi.x()}, xj {pgj.x()}, yi {pgi.y()}, yj {pgj.y()};
+        if (((yi < y && yj >= y) || (yj < y && yi >= y)) && (xi <= x || xj <=x))
+            res ^= (xi + (double(y) - yi) / (yj - yi) * (xj - xi) < x);
+    }
+    return res;
+}
+
+void fill_poly_liq(PPM_Image &I, const Polygon &pg, const PPM_Color &c) {
+    const size_t n {pg.size()};
+    if (n < 1) return;
+    int ymin {pg[0].y()}, ymax {ymin};
+    for (size_t i {1}; i < n; ++i) {
+        const int y {pg[i].y()};
+        if (y < ymin) ymin = y;
+        else if (y > ymax) ymax = y;
+    }
+    // building a vector of nodes, sorting them and filling the pixels
+    const int w {I.width()}, h {I.height()};
+    for (auto y = std::min(std::max(0, ymin), h);
+            y < std::min(std::max(0, ymax), h); ++y) {
+        std::vector<int> nodes;
+        for (size_t i {0}, j {n - 1}; i < n; j = i++) {
+            const int yi {pg[i].y()}, yj {pg[j].y()};
+            if ((yi < y && yj >= y) || (yj < y && yi >= y)) {
+                const int xi {pg[i].x()};
+                nodes.push_back(xi + (double(y) - yi) / (yj - yi) *
+                        (pg[j].x()- xi));
+            }
+        }
+        sort(std::begin(nodes), std::end(nodes));
+        for (size_t i {0}; i < nodes.size(); i += 2) {
+            for (auto x = std::min(std::max(0, nodes[i]), w);
+                    x < std::min(std::max(0, nodes[i + 1]), w); ++x)
+                I[x][y] = c.color();
+        }
+    }
+}
+
+void test_poly() {
+    const Polygon pg1 {{450, 250}, {450, 350}, {550, 350}, {550, 250},
+        {500, 300}};
+    constexpr Point p1 {500, 325}, p2 {400, 100}, p3 {500, 275};
+
+    constexpr int w {600}, h {400};
+    PPM_Image I {w, h};
+    pg1.draw(I, Color_name::red);
+    p1.draw(I);
+    p2.draw(I);
+    p3.draw(I);
+    std::cout << (is_in_poly(p1, pg1) ? "inside\n" : "outside\n");
+    std::cout << (is_in_poly(p2, pg1) ? "inside\n" : "outside\n");
+    std::cout << (is_in_poly(p3, pg1) ? "inside\n" : "outside\n");
+    fill_poly_liq(I, pg1, Color_name::yellow);
+
+    I.write_to("poly.ppm");
+}
+
+void test_fill_poly() {
+    constexpr int w {600}, h {400};
+    PPM_Image I {w, h};
+
+    const Polygon pg1 {{-10, 30}, {70, -10}, {90, 60}, {-30, 80}};
+    fill_poly_liq(I, pg1, PPM_Color{255, 160, 125});
+    pg1.draw(I, PPM_Color{53, 216, 185});
+
+    const Polygon pg2 {{500, 10}, {610, -50}, {700, -5}, {590, 70}, {550, 60}};
+    fill_poly_liq(I, pg2, PPM_Color{195, 83, 216});
+    pg2.draw(I, PPM_Color{142, 216, 52});
+
+    Polygon pg3 {{100, 80}, {120, 40}, {200, 10}, {350, 75}, {310, 85}};
+    pg3.push_back({255, 40}); pg3.push_back({225, 90});
+    pg3.push_back({185, 90}); pg3.push_back({205, 45});
+    pg3.push_back({215, 85}); pg3.push_back({235, 35});
+    pg3.push_back({165, 30}); pg3.push_back({150, 80});
+    pg3.push_back({135, 95}); pg3.push_back({115, 100});
+    fill_poly_liq(I, pg3, PPM_Color{60, 90, 255});
+    pg3.draw(I, PPM_Color{216, 174, 52});
+
+    Polygon pg4 {{50, 300}, {80, 200}, {140, 200}, {140, 330}, {100, 330},
+        {90, 270}, {130, 245}, {125, 210}, {110, 205}, {115, 315}};
+    fill_poly_liq(I, pg4, PPM_Color{8, 216, 82});
+    pg4.draw(I, PPM_Color{216, 35, 28});
+
+    I.write_to("filled_polygons.ppm");
+}
+
 int main() {
 
-    test_lines();
-    test_circles();
-    test_lenght_n_area();
-    test_filling_tri();
+    //test_lines();
+    //test_circles();
+    //test_lenght_n_area();
+    //test_filling_tri();
+    //test_point_array();
+    //test_random();
+    //test_poly();
+    test_fill_poly();
 
     return 0;
 }

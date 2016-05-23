@@ -3,13 +3,13 @@
 /*
  * ------------------ Point implementation ------------------
  */
-Point::Point(): x_{0}, y_{0} { }
+//constexpr Point::Point(): x_{0}, y_{0} { }
 
-Point::Point(const int xx, const int yy): x_{xx}, y_{yy} { }
+//constexpr Point::Point(const int xx, const int yy): x_{xx}, y_{yy} { }
 
-Point::Point(const double xd, const double yd): x_(xd), y_(yd) { }
+//constexpr Point::Point(const double xd, const double yd): x_(xd), y_(yd) { }
 
-Point::Point(const Point &o): x_{o.x()}, y_{o.y()} { }
+//Point::Point(const Point &o): x_{o.x()}, y_{o.y()} { }
 
 Point &Point::operator=(const Point &o) {
     if (this != &o) {
@@ -19,9 +19,11 @@ Point &Point::operator=(const Point &o) {
     return *this;
 }
 
-void Point::draw(PPM_Image &img, const PPM_Color &c) const {
-    img[x_][y_] = c.color();
+void Point::draw(PPM_Image &I, const PPM_Color &c) const {
+    I[x_][y_] = c.color();
 }
+
+void Point::fill(PPM_Image &I, const PPM_Color &c) const { Point::draw(I, c); }
 
 /*
  * ------------------ Line implementation ------------------
@@ -48,7 +50,7 @@ Line &Line::operator=(const Line &o) {
     return *this;
 }
 
-void Line::draw(PPM_Image &img, const PPM_Color &c) const {
+void Line::draw(PPM_Image &I, const PPM_Color &c) const {
     int x1 {p1_.x()}, y1 {p1_.y()}, x2 {p2_.x()}, y2 {p2_.y()};
     int dx {std::abs(x1- x2)}, dy {std::abs(y1 - y2)};
     const bool steep {dy > dx};
@@ -65,7 +67,7 @@ void Line::draw(PPM_Image &img, const PPM_Color &c) const {
     int e {dx};
     const uint clr {c.color()};
     for (int x {x1}; x <= x2; ++x) {
-        steep ? img[y1][x] = clr : img[x][y1] = clr;
+        steep ? I[y1][x] = clr : I[x][y1] = clr;
         if ((e -= incdy) < 0) {
             y1 += ystep;
             e += incdx;
@@ -73,8 +75,8 @@ void Line::draw(PPM_Image &img, const PPM_Color &c) const {
     }
 }
 
-void Line::fill(PPM_Image &img, const PPM_Color &c) const {
-    Line::draw(img, c);
+void Line::fill(PPM_Image &I, const PPM_Color &c) const {
+    Line::draw(I, c);
 }
 
 /*
@@ -111,13 +113,13 @@ double Triangle::area() const {
     return sqrt(s * (s - d1) * (s - d2) * (s - d3));
 }
 
-void Triangle::draw(PPM_Image &img, const PPM_Color &c) const {
-    Line{p1_, p2_}.draw(img, c);
-    Line{p2_, p3_}.draw(img, c);
-    Line{p3_, p1_}.draw(img, c);
+void Triangle::draw(PPM_Image &I, const PPM_Color &c) const {
+    Line{p1_, p2_}.draw(I, c);
+    Line{p2_, p3_}.draw(I, c);
+    Line{p3_, p1_}.draw(I, c);
 }
 
-void Triangle::fill(PPM_Image &img, const PPM_Color &c) const {
+void Triangle::fill(PPM_Image &I, const PPM_Color &c) const {
     Point p1 {p1_}, p2 {p2_}, p3 {p3_};
     if (p1.y() == p2.y() && p2.y() == p3.y()) // ignore dots
         return;
@@ -141,7 +143,7 @@ void Triangle::fill(PPM_Image &img, const PPM_Color &c) const {
         // fill the triangle
         const int y_cur {y1 + y};
         for (int x {xa}; x <= xb; ++x)
-            img[x][y_cur] = clr;
+            I[x][y_cur] = clr;
     }
 }
 

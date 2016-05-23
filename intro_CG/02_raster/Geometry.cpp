@@ -4,24 +4,52 @@
 /*
  * ------------------ Point implementation ------------------
  */
-Point::Point(): x_{0}, y_{0} { }
-
-Point::Point(const int xx, const int yy): x_{xx}, y_{yy} { }
-
-Point::Point(const double xd, const double yd): x_(xd), y_(yd) { }
-
-Point::Point(const Point &o): x_{o.x()}, y_{o.y()} { }
-
 Point& Point::operator=(const Point &o) {
+    if (this != &o) { x_ = o.getX(); y_ = o.getY(); } return *this;
+}
+
+void Point::draw(PPM_Image &I, const PPM_Color &c) const {
+    if (x_ >= 0 && x_ < I.width() && y_ >= 0 && y_ < I.height())
+        I[x_][y_] = c.color();
+}
+
+void Point::fill(PPM_Image &I, const PPM_Color &c) const { Point::draw(I, c); }
+
+/*
+ * ------------------ Point_array implementation ------------------
+ */
+Point_array::Point_array(): pa_{} { }
+
+Point_array::Point_array(const std::vector<Point> &p): pa_{p} { }
+
+Point_array::Point_array(const std::initializer_list<Point> &pil): pa_{} {
+    auto iter = std::begin(pil);
+    while (iter != std::end(pil))
+        pa_.push_back(*iter++);
+}
+
+Point_array::Point_array(const Point_array &o): pa_{o.pa_} { }
+
+Point_array& Point_array::operator=(const Point_array &o) {
+    if (this != &o) pa_ = o.pa_; return *this;
+}
+
+Point_array::Point_array(Point_array &&o): pa_{std::move(o.pa_)} { }
+
+Point_array& Point_array::operator=(Point_array &&o) {
     if (this != &o) {
-        x_ = o.x();
-        y_ = o.y();
+        pa_ = std::move(o.pa_);
+        std::cout << "moving\n";
     }
     return *this;
 }
 
-void Point::draw(PPM_Image &I, const PPM_Color &c) const {
-    I[x_][y_] = c.color();
+void Point_array::draw(PPM_Image &I, const PPM_Color &c) const {
+    for (const auto &p: pa_) p.draw(I, c);
+}
+
+void Point_array::fill(PPM_Image &I, const PPM_Color &c) const {
+    Point_array::draw(I, c);
 }
 
 /*
@@ -138,6 +166,24 @@ void Line::fill(PPM_Image &I, const PPM_Color &c) const {
 }
 
 /*
+ * ------------------ Polyline implementation ------------------
+ */
+double Polyline::length() const {
+    double d {0.0};
+    for (size_t i {0}; i < size() - 1; ++i) d += pa_[i].dist_to(pa_[i+ 1]);
+    return d;
+}
+
+void Polyline::draw(PPM_Image &I, const PPM_Color &c) const {
+    for (size_t i {0}; i < size() - 1; ++i)
+        Line{pa_[i], pa_[i+ 1]}.draw(I, c);
+}
+
+void Polyline::fill(PPM_Image &I, const PPM_Color &c) const {
+    Polyline::draw(I, c);
+}
+
+/*
  * ------------------ Triangle implementation ------------------
  */
 Triangle::Triangle(const Point &p1, const Point &p2, const Point &p3): p1_{p1},
@@ -166,9 +212,8 @@ double Triangle::length() const {
 }
 
 double Triangle::area() const {
-    const double d1 {p1_.dist_to(p2_)}, d2 {p2_.dist_to(p3_)};
-    const double d3 {p3_.dist_to(p1_)}, s {0.5 * (d1 + d2 + d3)};
-    return sqrt(s * (s - d1) * (s - d2) * (s - d3));
+    return std::abs((p2_.x() - p1_.x()) * (p3_.y() - p1_.y()) -
+        (p3_.x() - p1_.x()) * (p2_.y() - p1_.y())) * 0.5;
 }
 
 void Triangle::draw(PPM_Image &I, const PPM_Color &c) const {
@@ -276,6 +321,34 @@ void Triangle::fill_hs(PPM_Image &I, const PPM_Color &C) const {
             }
         }
     }
+}
+
+/*
+ * ------------------ Polygon implementation ------------------
+ */
+double Polygon::length() const {
+    return size() > 2 ? Polyline::length() + pa_[size() - 1].dist_to(pa_[0]) :
+        Polyline::length();
+}
+
+double Polygon::area() const {
+    const size_t n {size() - 1};
+    if (n < 2) return 0.0; // degenerate polygon
+    int d {pa_[0].x() * (pa_[1].y() - pa_[n].y()) +
+        pa_[n].x() * (pa_[0].y() - pa_[n - 1].y())};
+    for (size_t i {1}; i < n; ++i)
+        d += pa_[i].x() * (pa_[i + 1].y() - pa_[i - 1].y());
+    return d >= 0 ? d * 0.5 : -d * 0.5;
+}
+
+void Polygon::draw(PPM_Image &I, const PPM_Color &c) const {
+    for (size_t i {0}; i < size() - 1; ++i)
+        Line{operator[](i), operator[](i + 1)}.draw(I, c);
+    Line{operator[](size() - 1), operator[](0)}.draw(I, c);
+}
+
+void Polygon::fill(PPM_Image &I, const PPM_Color &c) const {
+    Polygon::draw(I, c);
 }
 
 /*
