@@ -167,28 +167,65 @@ Rectangle& Rectangle::operator=(const Rectangle &o) {
 
 void Rectangle::doDraw(PPM_Image &I, const PPM_Color &c) const {
     const int x1 = p_.x(), x2 = x1 + w_, y1 = p_.y(), y2 = y1 + h_;
-    const int w {I.width()}, h {I.height()};
+    const int w {I.width() - 1}, h {I.height() - 1};
     const int xmin {std::min(std::max(0, x1), w)};
     const int xmax {std::min(std::max(0, x2), w)};
     const int ymin {std::min(std::max(0, y1), h)};
     const int ymax {std::min(std::max(0, y2), h)};
     const uint clr {c.color()};
-    if (y1 >= 0 && y1 < h) {
+
+    /* drawing all sides: if the rectangle goes beyond the image size, then
+     * drawing lines on the image border
+     */
+    //for (auto x = xmin; x <= xmax; ++x) {
+    //    I[x][ymin] = clr;
+    //    I[x][ymax] = clr;
+    //}
+    //for (auto y = ymin; y <= ymax; ++y) {
+    //    I[xmin][y] = clr;
+    //    I[xmax][y] = clr;
+    //}
+
+    // avoid drawing lines on the border
+    if (y1 >= 0 && y1 <= h) {
         if (y2 >= 0 && y2 < h)
-            for (auto x = xmin; x < xmax; ++x) {
+            for (auto x = xmin; x <= xmax; ++x) {
                 I[x][y1] = clr;
                 I[x][y2] = clr;
             }
-        else for (auto x = xmin; x < xmax; ++x) I[x][y1] = clr;
-    }
-    if (x1 >= 0 && x1 < w) {
+        else
+            for (auto x = xmin; x <= xmax; ++x)
+                I[x][y1] = clr;
+    } else if (y2 >= 0 && y2 < h)
+        for (auto x = xmin; x <= xmax; ++x)
+            I[x][y2] = clr;
+
+    if (x1 >= 0 && x1 <= w) {
         if (x2 >= 0 && x2 < w)
-            for (auto y = ymin; y < ymax; ++y) {
+            for (auto y = ymin; y <= ymax; ++y) {
                 I[x1][y] = clr;
                 I[x2][y] = clr;
             }
-        else for (auto y = ymin; y < ymax; ++y) I[x1][y] = clr;
-    }
+        else
+            for (auto y = ymin; y <= ymax; ++y)
+                I[x1][y] = clr;
+    } else if (x2 >= 0 && x2 < w)
+        for (auto y = ymin; y <= ymax; ++y)
+            I[x2][y] = clr;
+
+    // the code below is shorter than above, but, perhaps, less efficient
+    //for (auto x = xmin; x < xmax; ++x) {
+    //    if (y1 >= 0 && y1 < h)
+    //        I[x][y1] = clr;
+    //    if (y2 >= 0 && y2 < h)
+    //        I[x][y2] = clr;
+    //}
+    //for (auto y = ymin; y < ymax; ++y) {
+    //    if (x1 >= 0 && x1 < w)
+    //        I[x1][y] = clr;
+    //    if (x2 >= 0 && x2 < w)
+    //        I[x2][y] = clr;
+    //}
 }
 
 void Rectangle::doFill(PPM_Image &I, const PPM_Color &c) const {

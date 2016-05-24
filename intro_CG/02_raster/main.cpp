@@ -272,7 +272,7 @@ void test_circles() {
 }
 
 void test_lenght_n_area() {
-    const Point p1 {0, 0}, p2 {100, 100};
+    constexpr Point p1 {0, 0}, p2 {100, 100};
     constexpr int r {1};
     const Line s {p1, p2};
     const Circle c1 {p1, r};
@@ -462,26 +462,37 @@ void test_fill_poly() {
 void test_rect() {
     constexpr int w {600}, h {400};
     PPM_Image I {w, h};
+
     Rectangle rect1 {{100, 100}, 200, 50};
     rect1.fill(I, Color_name::cyan);
     rect1.draw(I, Color_name::red);
+
     Rectangle rect2 {{-10, 300}, 500, 150};
-    rect2.fill(I, Color_name::magenta);
+    //rect2.fill(I, Color_name::magenta);
     rect2.draw(I, Color_name::green);
+
+    Rectangle rect3 {{510, 300}, 200, 150};
+    rect3.draw(I, Color_name::magenta);
+
+    Rectangle rect4 {{-10, -30}, 90, 150};
+    rect4.draw(I, Color_name::khaki);
+
+    Rectangle rect5 {{410, -90}, 250, 150};
+    rect5.draw(I, Color_name::red);
 
     I.write_to("rect.ppm");
 }
 
 int main() {
 
-    test_lines();
-    test_circles();
-    test_lenght_n_area();
-    test_filling_tri();
-    test_point_array();
-    test_random();
-    test_poly();
-    test_fill_poly();
+    //test_lines();
+    //test_circles();
+    //test_lenght_n_area();
+    //test_filling_tri();
+    //test_point_array();
+    //test_random();
+    //test_poly();
+    //test_fill_poly();
     test_rect();
 
     return 0;
