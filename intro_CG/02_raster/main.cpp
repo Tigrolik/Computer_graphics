@@ -492,8 +492,8 @@ int main() {
     //test_point_array();
     //test_random();
     //test_poly();
-    //test_fill_poly();
-    test_rect();
+    test_fill_poly();
+    //test_rect();
 
     return 0;
 }

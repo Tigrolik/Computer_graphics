@@ -49,6 +49,8 @@ struct Range_error: std::out_of_range {
 class Point; // forward declaration
 
 class Shape {
+protected:
+    Shape() = default;
 public:
     virtual double length() const { return 0; } // length, perimeter...
     virtual double area() const { return 0; }

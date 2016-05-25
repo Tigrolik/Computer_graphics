@@ -100,17 +100,17 @@ bool clip_line(int &x1, int &y1, int &x2, int &y2,
             const int code {code1 ? code1 : code2};
             double x {}, y {};
             if (code & top) {
-                x = x1 + (x2 - x1) * static_cast<double>(ymin - y1) / (y2 - y1);
+                x = x1 + (x2 - x1) * double(ymin - y1) / (y2 - y1);
                 y = ymin;
             } else if (code & bottom) {
-                x = x1 + (x2 - x1) * static_cast<double>(ymax - y1) / (y2 - y1);
+                x = x1 + (x2 - x1) * double(ymax - y1) / (y2 - y1);
                 y = ymax - 1;
             } else if (code & right) {
-                y = y1 + (y2 - y1) * static_cast<double>(xmax - x1) / (x2 - x1);
+                y = y1 + (y2 - y1) * double(xmax - x1) / (x2 - x1);
                 x = xmax - 1;
             }
             else if (code & left) {
-                y = y1 + (y2 - y1) * static_cast<double>(xmin - x1) / (x2 - x1);
+                y = y1 + (y2 - y1) * double(xmin - x1) / (x2 - x1);
                 x = xmin;
             }
             if (code == code1) {
@@ -154,6 +154,38 @@ void Line::doFill(PPM_Image &I, const PPM_Color &c) const {
 }
 
 /*
+ * helper methods for drawing straight lines: simpler than an arbitrary line
+ */
+void draw_horizontal_line(PPM_Image &I, const PPM_Color &c,
+        const int x1, const int x2, const int y) {
+    const uint clr {c.color()};
+    for (auto x = x1; x <= x2; ++x)
+        I[x][y] = clr;
+}
+
+void clip_n_draw_horizontal_line(PPM_Image &I, const PPM_Color &c,
+        const int x1, const int x2, const int y) {
+    const int w {I.width() - 1};
+    draw_horizontal_line(I, c, std::min(std::max(0, x1), w),
+            std::min(std::max(0, x2), w), y);
+}
+
+void draw_vertical_line(PPM_Image &I, const PPM_Color &c,
+        const int x, const int y1, const int y2) {
+    const uint clr {c.color()};
+    for (auto y = y1; y <= y2; ++y)
+        I[x][y] = clr;
+}
+
+void clip_n_draw_vertical_line(PPM_Image &I, const PPM_Color &c,
+        const int x, const int y1, const int y2) {
+    const int h {I.height() - 1};
+    draw_vertical_line(I, c, x, std::min(std::max(0, y1), h),
+            std::min(std::max(0, y2), h));
+}
+
+
+/*
  * ------------------ Rectangle implementation ------------------
  */
 Rectangle& Rectangle::operator=(const Rectangle &o) {
@@ -187,57 +219,58 @@ void Rectangle::doDraw(PPM_Image &I, const PPM_Color &c) const {
     //}
 
     // avoid drawing lines on the border
-    if (y1 >= 0 && y1 <= h) {
-        if (y2 >= 0 && y2 < h)
+    if (y1 >= 0) {
+        if (y2 < h)
             for (auto x = xmin; x <= xmax; ++x) {
                 I[x][y1] = clr;
                 I[x][y2] = clr;
             }
-        else
-            for (auto x = xmin; x <= xmax; ++x)
-                I[x][y1] = clr;
+        else if (y1 <= h)
+            draw_horizontal_line(I, c, xmin, xmax, y1);
+            //for (auto x = xmin; x <= xmax; ++x)
+            //    I[x][y1] = clr;
     } else if (y2 >= 0 && y2 < h)
-        for (auto x = xmin; x <= xmax; ++x)
-            I[x][y2] = clr;
+        draw_horizontal_line(I, c, xmin, xmax, y2);
+        //for (auto x = xmin; x <= xmax; ++x)
+        //    I[x][y2] = clr;
 
-    if (x1 >= 0 && x1 <= w) {
-        if (x2 >= 0 && x2 < w)
+    if (x1 >= 0) {
+        if (x2 < w)
             for (auto y = ymin; y <= ymax; ++y) {
                 I[x1][y] = clr;
                 I[x2][y] = clr;
             }
-        else
-            for (auto y = ymin; y <= ymax; ++y)
-                I[x1][y] = clr;
+        else if (x1 <= w)
+            draw_vertical_line(I, c, x1, ymin, ymax);
+            //for (auto y = ymin; y <= ymax; ++y)
+            //    I[x1][y] = clr;
     } else if (x2 >= 0 && x2 < w)
-        for (auto y = ymin; y <= ymax; ++y)
-            I[x2][y] = clr;
+        draw_vertical_line(I, c, x2, ymin, ymax);
+        //for (auto y = ymin; y <= ymax; ++y)
+        //    I[x2][y] = clr;
 
     // the code below is shorter than above, but, perhaps, less efficient
-    //for (auto x = xmin; x < xmax; ++x) {
-    //    if (y1 >= 0 && y1 < h)
-    //        I[x][y1] = clr;
-    //    if (y2 >= 0 && y2 < h)
-    //        I[x][y2] = clr;
-    //}
-    //for (auto y = ymin; y < ymax; ++y) {
-    //    if (x1 >= 0 && x1 < w)
-    //        I[x1][y] = clr;
-    //    if (x2 >= 0 && x2 < w)
-    //        I[x2][y] = clr;
-    //}
+    //if (y1 >= 0 && y1 < h)
+    //    draw_horizontal_line(I, c, xmin, xmax, y1);
+    //if (y2 >= 0 && y2 < h)
+    //    draw_horizontal_line(I, c, xmin, xmax, y2);
+    //if (x1 >= 0 && x1 < w)
+    //    draw_vertical_line(I, c, x1, ymin, ymax);
+    //if (x2 >= 0 && x2 < w)
+    //    draw_vertical_line(I, c, x2, ymin, ymax);
 }
 
 void Rectangle::doFill(PPM_Image &I, const PPM_Color &c) const {
-    const int w {I.width()}, h {I.height()};
+    const int w {I.width() - 1}, h {I.height() - 1};
     const int x1 = p_.x(), y1 = p_.y();
     const int xmin {std::min(std::max(0, x1), w)};
     const int xmax {std::min(std::max(0, x1 + int(w_)), w)};
-    const uint clr {c.color()};
+    //const uint clr {c.color()};
     for (auto y = std::min(std::max(0, y1), h);
-            y < std::min(std::max(0, y1 + int(h_)), h); ++y)
-        for (auto x = xmin; x < xmax; ++x)
-            I[x][y] = clr;
+            y <= std::min(std::max(0, y1 + int(h_)), h); ++y)
+        draw_horizontal_line(I, c, xmin, xmax, y);
+        //for (auto x = xmin; x < xmax; ++x)
+        //    I[x][y] = clr;
 }
 
 /*
@@ -313,17 +346,18 @@ void Triangle::doFill(PPM_Image &I, const PPM_Color &c) const {
     const int dx12 {x2- x1}, dx13 {x3 - x1}, dx23 {x3 - x2};
     const int dy12 {y2- y1}, dy23 {y3 - y2};
     const bool is_y12 {y1 == y2};
-    const uint clr {c.color()};
+    //const uint clr {c.color()};
     for (int y {0}; y < h; ++y) {
-        int xa {x1 + static_cast<int>(dx13 * (static_cast<double>(y) / h))};
-        int xb {(y > dy12 || is_y12) ? // which part of the triangle
-            x2 + static_cast<int>(dx23 * (static_cast<double>(y-dy12) / dy23)):
-                x1 + static_cast<int>(dx12 * (static_cast<double>(y) / dy12))};
+        int xa = x1 + dx13 * (double(y) / h);
+        // which part of the triangle
+        int xb = (y > dy12 || is_y12) ?  x2 + dx23 * (double(y-dy12) / dy23):
+            x1 + dx12 * (double(y) / dy12);
         if (xa > xb) std::swap(xa, xb);
         // fill the triangle
-        const int y_cur {y1 + y};
-        for (int x {xa}; x <= xb; ++x)
-            I[x][y_cur] = clr;
+        //const int y_cur {y1 + y};
+        draw_horizontal_line(I, c, xa, xb, y1 + y);
+        //for (int x {xa}; x <= xb; ++x)
+        //    I[x][y_cur] = clr;
     }
 }
 
@@ -349,7 +383,6 @@ void Triangle::fill_hs(PPM_Image &I, const PPM_Color &C) const {
     if ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1) < 0) {
         std::swap(x1, x3); std::swap(y1, y3);
     }
-    //if (x2 > x1) { std::swap(x1, x3); std::swap(y1, y3); }
     static constexpr int q {8}, q1 {q - 1};
     xmin &= ~(q - 1); ymin &= ~(q - 1); // start in corner of qxq block
     const int dx12 {x1 - x2}, dx23 {x2 - x3}, dx31 {x3 - x1};
@@ -434,7 +467,7 @@ void Polygon::doFill(PPM_Image &I, const PPM_Color &c) const {
         else if (y > ymax) ymax = y;
     }
     // building a vector of nodes, sorting them and filling the pixels
-    const int w {I.width()}, h {I.height()};
+    const int h {I.height()};
     for (auto y = std::min(std::max(0, ymin), h);
             y < std::min(std::max(0, ymax), h); ++y) {
         std::vector<int> nodes;
@@ -448,9 +481,10 @@ void Polygon::doFill(PPM_Image &I, const PPM_Color &c) const {
         }
         std::sort(std::begin(nodes), std::end(nodes));
         for (size_t i {0}; i < nodes.size(); i += 2)
-            for (auto x = std::min(std::max(0, nodes[i]), w);
-                    x < std::min(std::max(0, nodes[i + 1]), w); ++x)
-                I[x][y] = c.color();
+            clip_n_draw_horizontal_line(I, c, nodes[i], nodes[i + 1], y);
+            //for (auto x = std::min(std::max(0, nodes[i]), w);
+            //        x < std::min(std::max(0, nodes[i + 1]), w); ++x)
+            //    I[x][y] = c.color();
     }
 }
 
@@ -495,11 +529,16 @@ void Circle::doFill(PPM_Image &I, const PPM_Color &c) const {
     int x {0}, y = r_, f  = 1 - r_;
     while (x <= y) {
         f < 0 ? f += (++x << 1) + 3 : f += (++x << 1) - (--y << 1) + 5;
-        Line{xc - x, yc + y, xc + x, yc + y}.draw(I, c);
-        Line{xc - x, yc - y, xc + x, yc - y}.draw(I, c);
-        Line{xc - y, yc + x, xc + y, yc + x}.draw(I, c);
-        Line{xc - y, yc - x, xc + y, yc - x}.draw(I, c);
+        clip_n_draw_horizontal_line(I, c, xc - x, xc + x, yc + y);
+        clip_n_draw_horizontal_line(I, c, xc - x, xc + x, yc - y);
+        clip_n_draw_horizontal_line(I, c, xc - y, xc + y, yc + x);
+        clip_n_draw_horizontal_line(I, c, xc - y, xc + y, yc - x);
+        //Line{xc - x, yc + y, xc + x, yc + y}.draw(I, c);
+        //Line{xc - x, yc - y, xc + x, yc - y}.draw(I, c);
+        //Line{xc - y, yc + x, xc + y, yc + x}.draw(I, c);
+        //Line{xc - y, yc - x, xc + y, yc - x}.draw(I, c);
     }
-    Line(xc - r_, yc, xc + r_, yc).draw(I, c);
+    clip_n_draw_horizontal_line(I, c, xc - r_, xc + r_, yc);
+    //Line(xc - r_, yc, xc + r_, yc).draw(I, c);
 }
 
