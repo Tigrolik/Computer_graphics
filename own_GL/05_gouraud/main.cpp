@@ -70,7 +70,8 @@ void test_camera() {
           center {0, 0, 0};
     const Matrix ModelView {Matrix::lookat(eye, center, Vec3f{0, 1, 0})};
     const Matrix VP {Matrix::viewport(w >> 3, h >> 3, w * 3 / 4, h * 3 / 4, d)};
-    //const Matrix VP {viewport(w >> 3, h >> 3, (w >> 2) * 3, (h >> 2) * 3, d)};
+    //const Matrix VP {Matrix::viewport(w >> 3, h >> 3, (w >> 2) * 3,
+    //        (h >> 2) * 3, d)};
     Matrix Proj {Matrix::identity()};
     Proj[3][2] = -1.0 / (eye - center).norm();
     const Matrix Z {VP * Proj * ModelView};

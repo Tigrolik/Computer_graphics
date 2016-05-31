@@ -58,7 +58,7 @@ void test_model() {
     cout << "Norms: " << m.num_normals() << ", n[1]: " << m.normal(1,1) << endl;
     cout << "Texture vertices: " << m.num_texvertices() <<
         ", texv[1][1]: " << m.texvertex(1, 1) << endl;
-    cout << "Faces: " << m.num_faces() << ", f[1]: " << m.face(1) << endl;
+    cout << "Faces: " << m.num_faces() << ", f[2]: " << m.face(2) << endl;
     Vec3f v {m.normal(1, 2)}, v2 {m.normal(2, 1)};
     cout << v + v2 << endl;
 }
@@ -89,7 +89,7 @@ void test_camera() {
         // light intensity (kind of brightness)
         array<double, 3> br;
         for (int j {0}; j < 3; ++j) {
-            sc[j] = VP * Proj * ModelView * Matrix(wc[j]);
+            sc[j] = Z * Matrix(wc[j]);
             sc[j][1] = h - sc[j].y(); // flip upside down
             br[j] = m.normal(i, j) * light_dir;
         }
@@ -115,8 +115,8 @@ void test_bar() {
 int main() {
 
     //test_model();
-    //test_camera();
-    test_bar();
+    test_camera();
+    //test_bar();
 
     return 0;
 }
