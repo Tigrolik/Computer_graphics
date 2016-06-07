@@ -2,4 +2,4 @@ Here I have a collection of codes while following the OpenGL tutorial on
 http://learnopengl.com/
 
 The codes created in Linux, so to have them working it is assumed to have OpenGL
-libraries (GLEW, GLFW etc.) for C++ as well as a compiler for C++11
+ver3.3 libraries (GLEW, GLFW etc.) for C++ as well as a compiler for C++11
