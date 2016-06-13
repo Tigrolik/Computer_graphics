@@ -105,23 +105,31 @@ int main(int argc, char *argv[]) try {
             make_shader(GL_FRAGMENT_SHADER, frag_shad_src)
             );
 
+    static constexpr char num_options {'4'};
     if (argc > 1) {
-        switch (std::stoi(argv[1])) {
-            case 1:
-                draw_rect(win, shad_prog);
-                break;
-            case 2:
-                draw_two_triangles(win, shad_prog);
-                break;
-            case 3:
-                draw_two_triangles2(win, &shad_prog, 1);
-                break;
-            case 4:
-                draw_two_triangles3(win);
-                break;
-            case 0:
-            default:
-                draw_triangle(win, shad_prog);
+        const std::string s {argv[1]};
+        const char inp_char {s[0]};
+        if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
+            switch (inp_char - '0') {
+                case 1:
+                    draw_rect(win, shad_prog);
+                    break;
+                case 2:
+                    draw_two_triangles(win, shad_prog);
+                    break;
+                case 3:
+                    draw_two_triangles2(win, &shad_prog, 1);
+                    break;
+                case 4:
+                    draw_two_triangles3(win);
+                    break;
+                case 0:
+                default:
+                    draw_triangle(win, shad_prog);
+            }
+        } else {
+            std::cerr << "Wrong input: drawing default triangle\n";
+            draw_triangle(win, shad_prog);
         }
     } else {
         std::cout << "Note: the program can be used as follows:\n" <<

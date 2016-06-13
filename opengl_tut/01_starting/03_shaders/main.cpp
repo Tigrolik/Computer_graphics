@@ -49,26 +49,34 @@ int main(int argc, char *argv[]) try {
     static constexpr GLuint width {800}, height {600};
     GLFWwindow *win = init(width, height);
 
+    static constexpr char num_options {'5'};
     if (argc > 1) {
-        switch (std::stoi(argv[1])) {
-            case 1:
-                draw_glow_triangle(win);
-                break;
-            case 2:
-                draw_up_down_triangle(win);
-                break;
-            case 3:
-                draw_offset_triangle(win);
-                break;
-            case 4:
-                draw_pos2col_triangle(win);
-                break;
-            case 5:
-                draw_palette_triangle(win);
-                break;
-            case 0:
-            default:
-                draw_red_triangle(win);
+        const std::string s {argv[1]};
+        const char inp_char {s[0]};
+        if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
+            switch (inp_char - '0') {
+                case 1:
+                    draw_glow_triangle(win);
+                    break;
+                case 2:
+                    draw_up_down_triangle(win);
+                    break;
+                case 3:
+                    draw_offset_triangle(win);
+                    break;
+                case 4:
+                    draw_pos2col_triangle(win);
+                    break;
+                case 5:
+                    draw_palette_triangle(win);
+                    break;
+                case 0:
+                default:
+                    draw_red_triangle(win);
+            }
+        } else {
+            std::cerr << "Wrong input: drawing default triangle\n";
+            draw_red_triangle(win);
         }
     } else {
         std::cout << "Note: the program can be used as follows:\n" <<
@@ -130,8 +138,6 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
 
 /*
  * Game loop - keep things drawing
- * Last parameter is used here as a switch to choose either to draw the example
- * triangle or rectangle
  */
 void game_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad) {
     // polygon drawing mode: GL_FILL or GL_LINE
