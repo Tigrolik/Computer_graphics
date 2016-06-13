@@ -53,6 +53,7 @@ public:
     virtual double area() const = 0;
     virtual void draw(PPM_Image&, const PPM_Color&) const = 0;
     virtual void fill(PPM_Image&, const PPM_Color&) const = 0;
+    virtual ~Shape() { };
 };
 
 class Line: public Shape {

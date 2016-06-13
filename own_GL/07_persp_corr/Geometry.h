@@ -57,6 +57,7 @@ public:
     virtual double area() const { return 0; }
     void draw(PPM_Image &I, const PPM_Color &c = 255) const { doDraw(I, c); }
     void fill(PPM_Image &I, const PPM_Color &c = 255) const { doFill(I, c); }
+    virtual ~Shape() { };
 private:
     virtual void doDraw(PPM_Image&, const PPM_Color&) const = 0;
     virtual void doFill(PPM_Image&, const PPM_Color&) const = 0;
@@ -69,7 +70,7 @@ public:
     constexpr Point(const double xd, const double yd): x_(xd), y_(yd) { }
     constexpr Point(const Point &o): x_{o.getX()}, y_{o.getY()} { }
     Point& operator=(const Point&);
-    ~Point() = default;
+    ~Point() { };
 
     constexpr size_t size() const { return 2; }
 
@@ -111,7 +112,7 @@ public:
     Point_array& operator=(const Point_array&);
     Point_array(Point_array&&);
     Point_array& operator=(Point_array&&);
-    ~Point_array() = default;
+    ~Point_array() { };
 
     using iterator = typename std::vector<Point>::iterator;
     using const_iterator = typename std::vector<Point>::const_iterator;
@@ -154,7 +155,7 @@ public:
         p1_{Point{x1, y1}}, p2_{Point{x2, y2}} { }
     constexpr Line(const Line &o): p1_{o.p1_}, p2_{o.p2_} { }
     Line& operator=(const Line&);
-    ~Line() = default;
+    ~Line() { };
 
     constexpr double length() const override { return p1_.dist_to(p2_); }
 
@@ -173,7 +174,7 @@ public:
             const size_t hh): p_{Point{xx, yy}}, w_{ww}, h_{hh} { }
     constexpr Rectangle(const Rectangle &o): p_{o.p_}, w_{o.w_}, h_{o.h_} { }
     Rectangle& operator=(const Rectangle&);
-    ~Rectangle() = default;
+    ~Rectangle() { };
 
     constexpr double length() const override { return (w_ + h_) << 1; }
     constexpr double area() const override { return w_ * h_; }
@@ -207,7 +208,7 @@ public:
     Triangle(const int, const int, const int, const int, const int, const int);
     Triangle(const Triangle&);
     Triangle& operator=(const Triangle&);
-    ~Triangle() = default;
+    ~Triangle() { };
 
     double length() const override;
     double area() const override;
@@ -245,7 +246,7 @@ public:
     Circle(const int, const int, const size_t);
     Circle(const Circle&);
     Circle& operator=(const Circle&);
-    ~Circle() = default;
+    ~Circle() { };
 
     double length() const override { return pi * (r_ << 1); }
     double area() const override { return pi * sqr(r_); }

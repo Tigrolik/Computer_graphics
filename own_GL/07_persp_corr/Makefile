@@ -24,7 +24,7 @@ all:
 	$(CXX) $(SOURCES) $(CXXFLAGS) $(LIBS) -o $(TARGETS)
 
 clean:
-	@-rm -f $(TARGETS)
+	@-rm -f $(TARGETS) *.ppm
 
 distclean: clean
 	@-rm -f *~
