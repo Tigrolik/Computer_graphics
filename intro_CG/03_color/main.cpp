@@ -2,6 +2,7 @@
  *
  */
 
+
 #include "PPM_lib.h"
 #include "Geometry.h"
 #include <iostream>
@@ -17,7 +18,7 @@ static const std::string os_filesep {"\\"};
 static const std::string os_filesep {"/"};
 #endif
 
-// convert grayscale image to black and white image using a threshold value
+// convert gray-scale image to black and white image using a threshold value
 void gray2bw(PPM_lib::GS_Image &I, const unsigned char t = 128) {
     for (auto &x: I) for (auto &y: x)
         y = (y & 0xFF) > t ? 255 : 0;

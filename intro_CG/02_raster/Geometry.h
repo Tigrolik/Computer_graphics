@@ -52,6 +52,7 @@ class Shape {
 protected:
     Shape() = default;
 public:
+    virtual ~Shape() { }
     virtual double length() const { return 0; } // length, perimeter...
     virtual double area() const { return 0; }
     void draw(PPM_Image &I, const PPM_Color &c = 255) const { doDraw(I, c); }
