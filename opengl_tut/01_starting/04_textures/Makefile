@@ -17,7 +17,7 @@ CXX = g++
 CXXFLAGS = -O3 -g -std=c++11 -Wall -Wextra -Wshadow -pedantic -Werror -Weffc++
 
 # Flags for OpenGL (added -lSOIL for images)
-LIBS = -lGL -lGLU -lGLEW -lGLEW -lglfw3 -lXxf86vm -ldl -lX11 -lpthread\
+LIBS = -lGL -lGLU -lGLEW -lGLEW -lglfw -lXxf86vm -ldl -lX11 -lpthread\
 	-lXrandr -lXi -lXinerama -lXcursor -lSOIL
 
 SOURCES := $(wildcard *.cpp)
