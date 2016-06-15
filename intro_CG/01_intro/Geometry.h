@@ -38,18 +38,18 @@ public:
 
 class Point: public Shape {
 public:
-    constexpr Point(): x_{0}, y_{0} { }
-    constexpr Point(const int xx, const int yy): x_{xx}, y_{yy} { }
-    constexpr Point(const double xd, const double yd): x_(xd), y_(yd) { }
-    constexpr Point(const Point &o): x_{o.x()}, y_{o.y()} { }
+      Point(): x_{0}, y_{0} { }
+      Point(const int xx, const int yy): x_{xx}, y_{yy} { }
+      Point(const double xd, const double yd): x_(xd), y_(yd) { }
+      Point(const Point &o): x_{o.x()}, y_{o.y()} { }
     Point &operator=(const Point&);
 
     ~Point() = default;
 
-    constexpr int x() const { return x_; }
-    constexpr int y() const { return y_; }
+      int x() const { return x_; }
+      int y() const { return y_; }
 
-    constexpr double dist_to(const Point &o) const {
+      double dist_to(const Point &o) const {
         return sqrt(sqr(x_ - o.x_) + sqr(y_ - o.y_));
     }
     void draw(PPM_Image&, const PPM_Color& = 255) const override;

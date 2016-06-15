@@ -9,6 +9,7 @@
 #include "Geometry.h"
 #include <iostream>
 #include <chrono>
+#include <functional>
 
 /*
  * draw lines with a straightforward increment of both x and y coordinates
@@ -272,7 +273,7 @@ void test_circles() {
 }
 
 void test_lenght_n_area() {
-    constexpr Point p1 {0, 0}, p2 {100, 100};
+    Point p1 {0, 0}, p2 {100, 100};
     constexpr int r {1};
     const Line s {p1, p2};
     const Circle c1 {p1, r};
@@ -413,7 +414,7 @@ void fill_poly_scan(PPM_Image &I, const Polygon &pg, const PPM_Color &c) {
 void test_poly() {
     const Polygon pg1 {{450, 250}, {450, 350}, {550, 350}, {550, 250},
         {500, 300}};
-    constexpr Point p1 {500, 325}, p2 {400, 100}, p3 {500, 275};
+    Point p1 {500, 325}, p2 {400, 100}, p3 {500, 275};
 
     constexpr int w {600}, h {400};
     PPM_Image I {w, h};

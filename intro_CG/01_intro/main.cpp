@@ -16,8 +16,8 @@ int main() {
 
     // draw several dots in various ways
     // create a Point object and draw it onto the image with white (default)
-    constexpr Point p1 {150, 75}, p2 {38.9024, 24.782}, p3 {p2};
-    constexpr double d {p1.dist_to(p3)};
+    Point p1 {150, 75}, p2 {38.9024, 24.782}, p3 {p2};
+    double d {p1.dist_to(p3)};
     std::cout << d << '\n';
     p1.draw(I);
     // draw a point right after constructing it
