@@ -37,7 +37,7 @@ static constexpr double pi {std::acos(-1)};
 
 // function to compute a square value: x^2
 template <class T>
-constexpr T sqr(const T &val) { return val * val; }
+    constexpr T sqr(const T &val) { return val * val; }
 
 /*
  * ------------------ Range_error struct ------------------
@@ -46,7 +46,7 @@ struct Range_error: std::out_of_range {
     size_t idx;
     Range_error(const size_t i):
         std::out_of_range{"Range error: index " + std::to_string(i)}, idx{i} {
-    }
+        }
 };
 
 class Point; // forward declaration
@@ -67,14 +67,14 @@ private:
 
 class Point: public Shape {
 public:
-      Point(): x_{0}, y_{0} { }
-      Point(const int xx, const int yy): x_{xx}, y_{yy} { }
-      Point(const double xd, const double yd): x_(xd), y_(yd) { }
-      Point(const Point &o): x_{o.getX()}, y_{o.getY()} { }
+    Point(): x_{0}, y_{0} { }
+    Point(const int xx, const int yy): x_{xx}, y_{yy} { }
+    Point(const double xd, const double yd): x_(xd), y_(yd) { }
+    Point(const Point &o): x_{o.getX()}, y_{o.getY()} { }
     Point& operator=(const Point&);
     ~Point() = default;
 
-      size_t size() const { return 2; }
+    size_t size() const { return 2; }
 
     int& operator[](const size_t i) { return (i < 1) ? x_ : y_; }
     const int& operator[](const size_t i) const { return (i < 1) ? x_ : y_; }
@@ -87,14 +87,14 @@ public:
             (throw Range_error(i), operator[](i));
     }
 
-      int getX() const { return x_; }
-      int getY() const { return y_; }
+    int getX() const { return x_; }
+    int getY() const { return y_; }
     const int& x() const { return x_; }
     const int& y() const { return y_; }
     int& x() { return x_; }
     int& y() { return y_; }
 
-      double dist_to(const Point &o) const {
+    double dist_to(const Point &o) const {
         return sqrt(sqr(x_ - o.x_) + sqr(y_ - o.y_));
     }
 
@@ -150,16 +150,16 @@ protected:
 
 class Line: public Shape {
 public:
-      Line(const Point &p1, const Point &p2): p1_{p1}, p2_{p2} { }
-      Line(const Point &pp, const int xx, const int yy):
+    Line(const Point &p1, const Point &p2): p1_{p1}, p2_{p2} { }
+    Line(const Point &pp, const int xx, const int yy):
         p1_{pp}, p2_{Point{xx, yy}} { }
-      Line(const int x1, const int y1, const int x2, const int y2):
+    Line(const int x1, const int y1, const int x2, const int y2):
         p1_{Point{x1, y1}}, p2_{Point{x2, y2}} { }
-      Line(const Line &o): p1_{o.p1_}, p2_{o.p2_} { }
+    Line(const Line &o): p1_{o.p1_}, p2_{o.p2_} { }
     Line& operator=(const Line&);
     ~Line() = default;
 
-      double length() const override { return p1_.dist_to(p2_); }
+    double length() const override { return p1_.dist_to(p2_); }
 
 private:
     Point p1_;
@@ -170,16 +170,16 @@ private:
 
 class Rectangle: public Shape {
 public:
-      Rectangle(const Point &pp, const size_t ww, const size_t hh):
+    Rectangle(const Point &pp, const size_t ww, const size_t hh):
         p_{pp}, w_{ww}, h_{hh} { }
-      Rectangle(const int xx, const int yy,const size_t ww,
+    Rectangle(const int xx, const int yy,const size_t ww,
             const size_t hh): p_{Point{xx, yy}}, w_{ww}, h_{hh} { }
-      Rectangle(const Rectangle &o): p_{o.p_}, w_{o.w_}, h_{o.h_} { }
+    Rectangle(const Rectangle &o): p_{o.p_}, w_{o.w_}, h_{o.h_} { }
     Rectangle& operator=(const Rectangle&);
     ~Rectangle() = default;
 
-      double length() const override { return (w_ + h_) << 1; }
-      double area() const override { return w_ * h_; }
+    double length() const override { return (w_ + h_) << 1; }
+    double area() const override { return w_ * h_; }
 
 private:
     Point p_;

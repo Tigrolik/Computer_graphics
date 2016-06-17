@@ -230,12 +230,12 @@ void Rectangle::doDraw(RGB_Image &I, const RGB_Color &c) const {
             }
         else if (y1 <= h)
             draw_horizontal_line(I, c, xmin, xmax, y1);
-            //for (auto x = xmin; x <= xmax; ++x)
-            //    I[x][y1] = clr;
+        //for (auto x = xmin; x <= xmax; ++x)
+        //    I[x][y1] = clr;
     } else if (y2 >= 0 && y2 < h)
         draw_horizontal_line(I, c, xmin, xmax, y2);
-        //for (auto x = xmin; x <= xmax; ++x)
-        //    I[x][y2] = clr;
+    //for (auto x = xmin; x <= xmax; ++x)
+    //    I[x][y2] = clr;
 
     if (x1 >= 0) {
         if (x2 < w)
@@ -245,12 +245,12 @@ void Rectangle::doDraw(RGB_Image &I, const RGB_Color &c) const {
             }
         else if (x1 <= w)
             draw_vertical_line(I, c, x1, ymin, ymax);
-            //for (auto y = ymin; y <= ymax; ++y)
-            //    I[x1][y] = clr;
+        //for (auto y = ymin; y <= ymax; ++y)
+        //    I[x1][y] = clr;
     } else if (x2 >= 0 && x2 < w)
         draw_vertical_line(I, c, x2, ymin, ymax);
-        //for (auto y = ymin; y <= ymax; ++y)
-        //    I[x2][y] = clr;
+    //for (auto y = ymin; y <= ymax; ++y)
+    //    I[x2][y] = clr;
 
     // the code below is shorter than above, but, perhaps, less efficient
     //if (y1 >= 0 && y1 < h)
@@ -272,8 +272,8 @@ void Rectangle::doFill(RGB_Image &I, const RGB_Color &c) const {
     for (auto y = std::min(std::max(0, y1), h);
             y <= std::min(std::max(0, y1 + int(h_)), h); ++y)
         draw_horizontal_line(I, c, xmin, xmax, y);
-        //for (auto x = xmin; x < xmax; ++x)
-        //    I[x][y] = clr;
+    //for (auto x = xmin; x < xmax; ++x)
+    //    I[x][y] = clr;
 }
 
 /*
@@ -299,7 +299,7 @@ void Polyline::doFill(RGB_Image &I, const RGB_Color &c) const {
  */
 Triangle::Triangle(const Point &p1, const Point &p2, const Point &p3): p1_{p1},
     p2_{p2}, p3_{p3} {
-}
+    }
 
 Triangle::Triangle(const int x1, const int y1, const int x2, const int y2,
         const int x3, const int y3): p1_{Point{x1, y1}}, p2_{Point{x2, y2}},
@@ -324,7 +324,7 @@ double Triangle::length() const {
 
 double Triangle::area() const {
     return std::abs((p2_.x() - p1_.x()) * (p3_.y() - p1_.y()) -
-        (p3_.x() - p1_.x()) * (p2_.y() - p1_.y())) * 0.5;
+            (p3_.x() - p1_.x()) * (p2_.y() - p1_.y())) * 0.5;
 }
 
 void Triangle::doDraw(RGB_Image &I, const RGB_Color &c) const {
@@ -516,9 +516,9 @@ void Polygon::doFill(RGB_Image &I, const RGB_Color &c) const {
         std::sort(std::begin(nodes), std::end(nodes));
         for (size_t i {0}; i < nodes.size(); i += 2)
             clip_n_draw_horizontal_line(I, c, nodes[i], nodes[i + 1], y);
-            //for (auto x = std::min(std::max(0, nodes[i]), w);
-            //        x < std::min(std::max(0, nodes[i + 1]), w); ++x)
-            //    I[x][y] = c.color();
+        //for (auto x = std::min(std::max(0, nodes[i]), w);
+        //        x < std::min(std::max(0, nodes[i + 1]), w); ++x)
+        //    I[x][y] = c.color();
     }
 }
 

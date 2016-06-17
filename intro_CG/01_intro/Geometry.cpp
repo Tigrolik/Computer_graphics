@@ -33,7 +33,7 @@ Line::Line(const Point &p1, const Point &p2): p1_{p1}, p2_{p2} {
 
 Line::Line(const Point &p, const int xx, const int yy):
     p1_{p}, p2_{Point{xx, yy}} {
-}
+    }
 
 Line::Line(const int x1, const int y1, const int x2, const int y2):
     p1_{Point{x1, y1}}, p2_{Point{x2, y2}} {

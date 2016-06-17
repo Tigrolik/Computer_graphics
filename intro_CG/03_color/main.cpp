@@ -1,5 +1,7 @@
 /*
- *
+ * Practicing with colors:
+ *      converting RGB to Grayscale, filtering, extracting color channels,
+ *      representing various color spaces, displaying color palettes
  */
 
 
@@ -56,7 +58,7 @@ void ordered_dither(PPM_lib::GS_Image &I) {
     for (size_t x {0}; x < I.width(); ++x)
         for (size_t y {0}; y < h; ++y)
             I[x][y] = (I[x][y] * 17 >> 8) > M4[x % 4][y % 4] ? 255 : 0;
-            //I[x][y] = (I[x][y] * 5 >> 8) > M2[x % 2][y % 2] ? 255 : 0;
+    //I[x][y] = (I[x][y] * 5 >> 8) > M2[x % 2][y % 2] ? 255 : 0;
 }
 
 void ordered_dither(PPM_lib::RGB_Image &I) {
