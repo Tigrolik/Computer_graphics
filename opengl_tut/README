@@ -4,4 +4,4 @@ http://learnopengl.com/
 The codes created in Linux, so to have them working it is assumed to have OpenGL
 ver3.3 libraries (GLEW, GLFW etc.) for C++ as well as a compiler for C++11.
 Some OpenGL libraries can be installed on (L)ubuntu using apt-get:
-sudo apt-get install libglew-dev libglfw3-dev libsoil-dev
+sudo apt-get install libglew-dev libglfw3-dev libsoil-dev libglm-dev
