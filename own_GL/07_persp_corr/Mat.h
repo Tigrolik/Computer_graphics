@@ -313,6 +313,36 @@ operator*(const Mat<R, RC, Num> &lhs, const Mat<RC, C, Comp> &rhs) {
 /*
  * ------------------ Mat functions ------------------
  */
+// get matrix minor
+template <size_t R, size_t C, class Num>
+inline Mat<R - 1, C - 1, Num> mat_minor(const Mat<R, C, Num> &M,
+        const size_t row_idx, const size_t col_idx) {
+    Mat<R - 1, C - 1, Num> ret;
+    for (size_t i {0}; i < R - 1; ++i)
+        for (size_t j {0}; j < C - 1; ++j)
+            ret[i][j] = M[i < row_idx ? i : i + 1][j < col_idx ? j : j + 1];
+    return ret;
+}
+
+// calculate matrix determinant: version for 3x3 matrix
+template <class Num>
+inline Num det3(const Mat<3, 3, Num> &M) {
+    return M[0][0] * M[1][1] * M[2][2] + M[0][1] * M[1][2] * M[2][0] +
+        M[0][2] * M[1][0] * M[2][1] - M[0][2] * M[1][1] * M[2][0] -
+        M[0][1] * M[1][0] * M[2][2] - M[0][0] * M[1][2] * M[2][1];
+}
+
+// inverse transpose matrix
+template <size_t N, class Num>
+inline Mat<N, N, Num> invert_transpose(const Mat<N, N, Num> &M) {
+    Mat<N, N, double> ret;
+    for (size_t i {0}; i < N; ++i)
+        for (size_t j {0}; j < N; ++j)
+            ret[i][j] = det3(mat_minor(M, i, j)) * ((i + j) & 1 ? -1 : 1);
+    return ret / double(ret[0] * M[0]);
+}
+
+// identity matrix
 template <size_t N>
 inline Mat<N, N, int> eye() {
     Mat<N, N, int> M (0);
@@ -320,6 +350,7 @@ inline Mat<N, N, int> eye() {
     return M;
 }
 
+// viewport matrix
 inline Mat<4, 4, double> viewport(const int xx, const int yy,
         const int w, const int h, const int d) {
     Mat<4, 4, double> m {eye<4>()};
@@ -329,6 +360,7 @@ inline Mat<4, 4, double> viewport(const int xx, const int yy,
     return m;
 }
 
+// lookat matrix
 inline Mat<4, 4, double> lookat(const Vec<3, double> &Eye,
         const Vec<3, double> &Cen, const Vec<3, double> &Up) {
     const Vec<3, double> z {(Eye - Cen).normalize()};
@@ -342,6 +374,7 @@ inline Mat<4, 4, double> lookat(const Vec<3, double> &Eye,
     return Minv;
 }
 
+// projection matrix
 inline Mat<4, 4, double> projection(const double coeff) {
     Mat<4, 4, double> Proj {eye<4>()};
     Proj[3][2] = coeff;

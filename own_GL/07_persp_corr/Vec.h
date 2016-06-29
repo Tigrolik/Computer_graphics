@@ -256,9 +256,29 @@ inline typename std::common_type<Num, Comp>::type operator*(
     return res;
 }
 
+template <size_t N, class Num, class Comp>
+inline typename std::common_type<Num, Comp>::type dot(
+        const Vec<N, Num> &lhs, const Vec<N, Comp> &rhs) {
+    //return std::inner_product(std::begin(lhs), std::end(lhs), std::begin(rhs),
+    //        0.0, std::plus<double>(), std::multiplies<double>());
+    typename std::common_type<Num, Comp>::type res = 0;
+    for (auto i = N; i--; res += lhs[i] * rhs[i]) { }
+    return res;
+}
+
 // cross product: we have it implemented only for 3-element vector
 template <class Num, class Comp>
 constexpr Vec<3, class std::common_type<Num, Comp>::type> operator^(
+        const Vec<3, Num> &lhs, const Vec<3, Comp> &rhs) {
+    return std::array<class std::common_type<Num, Comp>::type, 3> {
+        lhs[1] * rhs[2] - lhs[2] * rhs[1], // y * z - z * y
+        lhs[2] * rhs[0] - lhs[0] * rhs[2], // z * x - x * z
+        lhs[0] * rhs[1] - lhs[1] * rhs[0], // x * y - y * x
+    };
+}
+
+template <class Num, class Comp>
+constexpr Vec<3, class std::common_type<Num, Comp>::type> cross(
         const Vec<3, Num> &lhs, const Vec<3, Comp> &rhs) {
     return std::array<class std::common_type<Num, Comp>::type, 3> {
         lhs[1] * rhs[2] - lhs[2] * rhs[1], // y * z - z * y
@@ -288,7 +308,6 @@ Vec<M, Num> resize(const Vec<N, Num> &v, const Num& fill = 1) {
     for (size_t i = N; i--; res[i] = v[i]) { }
     return res;
 }
-
 
 #endif
 

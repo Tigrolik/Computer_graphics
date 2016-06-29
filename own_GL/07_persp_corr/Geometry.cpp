@@ -436,15 +436,15 @@ void Triangle::fill_hs(PPM_Image &I, const PPM_Color &C) const {
  */
 Vec<3, double> bary(const Point &p1, const Point &p2, const Point &p3,
         const Point &p) {
-    const int x1 {p1.x()}, y1 {p1.y()}, x2 {p2.x()}, y2 {p2.y()};
-    const int x3 {p3.x()}, y3 {p3.y()}, x {p.x()}, y {p.y()};
-    const int dx13 {x1 - x3}, dx32 {x3 - x2}, dy13 {y1 - y3}, dy23 {y2 - y3};
-    const double z = dy23 * dx13 + dx32 * dy13;
-    if (std::abs(z) < 0.5) return {-1, 1, 1};
-    const int dx3 {x - x3}, dy3 {y - y3};
-    const double lam1 {(dy23 * dx3 + dx32 * dy3) / z};
-    const double lam2 {(dx13 * dy3 - dy13 * dx3 ) / z};
-    return {1 - lam1 - lam2, lam1, lam2};
+    const int x1 {p1.x()}, x3 {p3.x()}, dx31 {x3 - x1}, dx21 {p2.x() - x1};
+    const int y1 {p1.y()}, y3 {p3.y()}, dy31 {y3 - y1}, dy21 {p2.y() - y1};
+    // the only double var: contains int value but make the output double
+    const double z = dx31 * dy21 - dx21 * dy31;
+    if (std::abs(z) < 0.5)
+        return {-1, 1, 1};
+    const int dx1 {x1 - p.x()}, dy1 {y1 - p.y()};
+    const int lam1 {dx21 * dy1 - dy21 * dx1}, lam2 {dy31 * dx1 - dx31 * dy1};
+    return {1 - (lam1 + lam2) / z, lam2 / z, lam1 / z};
 }
 
 void Triangle::fill_bary(PPM_Image &I, const PPM_Color &C) const {

@@ -106,5 +106,12 @@ private:
 
 };
 
+// multiply PPM_Color by a value
+inline PPM_Color operator*(const PPM_Color &lhs, const double &rhs) {
+    return PPM_Color {uchar(lhs.red() * rhs), uchar(lhs.green() * rhs),
+        uchar(lhs.blue() * rhs)};
+}
+
+
 #endif
 
