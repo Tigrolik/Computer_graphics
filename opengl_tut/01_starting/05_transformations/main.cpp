@@ -48,6 +48,8 @@ void make_textures(const GLuint, const std::string&,
 
 // drawing rotating and scaling containers
 void rotating_container(GLFWwindow*, const int = 0);
+void rotating_loop(GLFWwindow*, const GLuint, const Shader&,
+        const std::vector<GLuint>&, const std::vector<std::string>&, const int);
 
 // function to compute sizeof elements lying in the vector container
 template <class T>
@@ -57,10 +59,8 @@ constexpr size_t size_of_elements(const std::vector<T> &v) {
 
 // here goes the main()
 int main(int argc, char *argv[]) try {
-
     static constexpr GLuint width {800}, height {600};
     GLFWwindow *win = init(width, height);
-
     static constexpr char num_options {'2'};
     if (argc > 1) {
         const std::string s {argv[1]};
@@ -89,10 +89,8 @@ int main(int argc, char *argv[]) try {
             "2:\ttow boxes (rotating vs scaled)\n";
         rotating_container(win);
     }
-
     // clean up and exit properly
     return clean_up(0);
-
 } catch (const std::runtime_error &e) {
     std::cerr << e.what() << '\n';
     return clean_up(1);
@@ -137,35 +135,6 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glViewport(0, 0, w, h);
 
     return win;
-}
-
-/*
- * Game loop - keep things drawing
- */
-void game_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
-        const std::vector<GLuint> &tex, const std::vector<std::string> &samp,
-        const GLuint num_nodes, const int) {
-    while (!glfwWindowShouldClose(win)) {
-        glfwPollEvents();
-
-        glClearColor(0.41f, 0.75f, 0.4f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        shad.use();
-
-        // bind textures using texture units
-        for (size_t i {0}; i < tex.size(); ++i) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, tex[i]);
-            glUniform1i(glGetUniformLocation(shad.id(), samp[i].c_str()), i);
-        }
-
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, num_nodes, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-
-        glfwSwapBuffers(win);
-    }
 }
 
 /*
@@ -281,13 +250,25 @@ void rotating_container(GLFWwindow *win, const int option) {
     make_objects(VAO, VBO, EBO, vertices, indices);
 
     // Load and create textures
-    const auto num_imgs = tex_imgs.size(), num_elems = indices.size();
+    const auto num_imgs = tex_imgs.size();
     std::vector<GLuint> textures(num_imgs);
     gen_textures(textures);
 
     for (size_t i {0}; i < num_imgs; ++i)
         make_textures(textures[i], tex_imgs[i], GL_REPEAT, GL_LINEAR);
 
+    rotating_loop(win, VAO, shad, textures, frag_uni_tex, option);
+
+    // cleaning up
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+}
+
+// implementing the drawing (game) loop
+void rotating_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
+        const std::vector<GLuint> &textures,
+        const std::vector<std::string> &tex_frag_uni, const int option) {
     const GLuint trans_loc = glGetUniformLocation(shad.id(), "transform");
     while (!glfwWindowShouldClose(win)) {
         glfwPollEvents();
@@ -296,11 +277,11 @@ void rotating_container(GLFWwindow *win, const int option) {
         glClear(GL_COLOR_BUFFER_BIT);
 
         // bind textures using texture units
-        for (size_t i {0}; i < num_imgs; ++i) {
+        for (size_t i {0}; i < textures.size(); ++i) {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, textures[i]);
             glUniform1i(glGetUniformLocation(shad.id(),
-                        frag_uni_tex[i].c_str()), i);
+                        tex_frag_uni[i].c_str()), i);
         }
 
         shad.use();
@@ -321,7 +302,7 @@ void rotating_container(GLFWwindow *win, const int option) {
         glUniformMatrix4fv(trans_loc, 1, GL_FALSE, glm::value_ptr(trans));
 
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, num_elems, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         if (option == 2) { // second box
             const GLfloat sc_r = std::abs(sin(glfwGetTime()));
@@ -332,16 +313,12 @@ void rotating_container(GLFWwindow *win, const int option) {
             glUniformMatrix4fv(trans_loc, 1, GL_FALSE, glm::value_ptr(trans));
 
             glBindVertexArray(VAO);
-            glDrawElements(GL_TRIANGLES, num_elems, GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
 
         glBindVertexArray(0);
         glfwSwapBuffers(win);
     }
 
-    // cleaning up
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
 }
 

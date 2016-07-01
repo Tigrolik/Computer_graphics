@@ -69,65 +69,23 @@ constexpr size_t size_of_elements(const std::vector<T> &v) {
     return v.size() * sizeof(T);
 }
 
+// process user input
+void process_input(GLFWwindow*, const std::string&);
+// display menu of possible actions and process them
+void show_menu(GLFWwindow*, const std::string&);
 
 // here goes the main()
 int main(int argc, char *argv[]) try {
-
     static constexpr GLuint width {800}, height {600};
     GLFWwindow *win = init(width, height);
 
-    static constexpr char num_options {'7'};
-    if (argc > 1) {
-        const std::string s {argv[1]};
-        const char inp_char {s[0]};
-        if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
-            switch (inp_char - '0') {
-                case 1:
-                    draw_disco_container(win);
-                    break;
-                case 2:
-                    draw_container_with_face(win);
-                    break;
-                case 3:
-                    draw_container_with_face_to_left(win);
-                    break;
-                case 4:
-                    draw_four_containers(win);
-                    break;
-                case 5:
-                    draw_center_pixels(win);
-                    break;
-                case 6:
-                    draw_container_face_mix(win);
-                    break;
-                case 7:
-                    draw_wall_triangle(win);
-                    break;
-                case 0:
-                default:
-                    draw_container(win);
-            }
-        } else {
-            std::cerr << "Wrong input: drawing default box\n";
-            draw_container(win);
-        }
-    } else {
-        std::cout << "Note: the program can be run as follows:\n" <<
-            argv[0] << " int_param, where int_param is:\n" <<
-            "0:\tbox (default)\n" <<
-            "1:\t\"disco\" box\n" <<
-            "2:\tbox with a smiley\n" <<
-            "3:\tbox with smiley looking to the left\n" <<
-            "4:\tfour boxes with smileys\n" <<
-            "5:\tcenter box-smiley pixels\n" <<
-            "6:\tbox-smiley (use up-down arrow keys)\n" <<
-            "7:\ttriangle with a brick wall pattern\n";
-        draw_container(win);
-    }
+    if (argc > 1)
+        process_input(win, argv[1]);
+    else
+        show_menu(win, argv[0]);
 
     // clean up and exit properly
     return clean_up(0);
-
 } catch (const std::runtime_error &e) {
     std::cerr << e.what() << '\n';
     return clean_up(1);
@@ -137,6 +95,63 @@ int main(int argc, char *argv[]) try {
 } catch (...) {
     std::cerr << "Unknown exception\n";
     return clean_up(3);
+}
+
+/*
+ * Process user input
+ */
+void process_input(GLFWwindow *win, const std::string &inp) {
+    static constexpr char num_options {'7'};
+    const std::string s {inp};
+    const char inp_char {s[0]};
+    if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
+        switch (inp_char - '0') {
+            case 1:
+                draw_disco_container(win);
+                break;
+            case 2:
+                draw_container_with_face(win);
+                break;
+            case 3:
+                draw_container_with_face_to_left(win);
+                break;
+            case 4:
+                draw_four_containers(win);
+                break;
+            case 5:
+                draw_center_pixels(win);
+                break;
+            case 6:
+                draw_container_face_mix(win);
+                break;
+            case 7:
+                draw_wall_triangle(win);
+                break;
+            case 0:
+            default:
+                draw_container(win);
+        }
+    } else {
+        std::cerr << "Wrong input: drawing default box\n";
+        draw_container(win);
+    }
+}
+
+/*
+ * Display a menu of possible actions
+ */
+void show_menu(GLFWwindow *win, const std::string &prog_name) {
+    std::cout << "Note: the program can be run as follows:\n" <<
+        prog_name << " int_param, where int_param is:\n" <<
+        "0:\tbox (default)\n" <<
+        "1:\t\"disco\" box\n" <<
+        "2:\tbox with a smiley\n" <<
+        "3:\tbox with smiley looking to the left\n" <<
+        "4:\tfour boxes with smileys\n" <<
+        "5:\tcenter box-smiley pixels\n" <<
+        "6:\tbox-smiley (use up-down arrow keys)\n" <<
+        "7:\ttriangle with a brick wall pattern\n";
+    draw_container(win);
 }
 
 /*

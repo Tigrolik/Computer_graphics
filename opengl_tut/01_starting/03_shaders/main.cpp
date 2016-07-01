@@ -45,10 +45,8 @@ void drawing_triangle(GLFWwindow*, const Shader&, const GLfloat*, const GLuint);
 
 // here goes the main()
 int main(int argc, char *argv[]) try {
-
     static constexpr GLuint width {800}, height {600};
     GLFWwindow *win = init(width, height);
-
     static constexpr char num_options {'5'};
     if (argc > 1) {
         const std::string s {argv[1]};
@@ -86,10 +84,8 @@ int main(int argc, char *argv[]) try {
             "4:\ttriangle (position to color)\n5:\tpalette triangle\n";
         draw_red_triangle(win);
     }
-
     // clean up and exit properly
     return clean_up(0);
-
 } catch (const std::runtime_error &e) {
     std::cerr << e.what() << '\n';
     return clean_up(1);

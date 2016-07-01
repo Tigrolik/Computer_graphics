@@ -1,9 +1,13 @@
 /*
  * Following tutorial on OpenGL (textures):
- * http://learnopengl.com/#!Getting-started/Coordinate-Systems
+ * http://learnopengl.com/#!Getting-started/Camera
  *
- * Working with coordinate systems, drawing 3D boxes and applying
- * transformations to them
+ * Experimenting with view matrix. Enabling user interaction with "camera" via
+ * keyboard and mouse. Setting up "camera" view using Euler pitch * and yaw
+ * angles. Making Camera class.
+ *
+ * Note: decided to add key Q for closing the main window (quitting), so now it
+ * closes if a user presses either escape or Q button.
  */
 
 #include <iostream>
@@ -21,18 +25,39 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Shader.h"
+#include "Camera.h"
 
-// path to the folder where we keep shaders and textures
+// paths to the folder where we keep shaders and textures: global vars
 static const std::string shad_path {"../../shaders/"};
 static const std::string tex_path {"../../images/"};
+
+// tracking which keys have been pressed/released (for smooth movement)
+static bool keys[1024];
+
+// global values to keep track of time between the frames
+static GLfloat delta_frame_time = 0;
+static GLfloat last_frame_time  = 0;
+
+// last cursor position
+static GLfloat last_x = 0, last_y = 0;
+
+// avoid sudden jump of the camera at the beginning
+static bool first_mouse_move = true;
+
+// using Camera class
+static Camera main_cam {glm::vec3{0, 0, 3}};
 
 /*
  * Functions declarations
  */
 // initialize stuff
 GLFWwindow* init(const GLuint, const GLuint);
-// callback function
+// callback functions
 void key_callback(GLFWwindow*, const int, const int, const int, const int);
+void mouse_callback(GLFWwindow*, const double, const double);
+void scroll_callback(GLFWwindow*, const double, const double);
+// movement function
+void do_movement();
 // cleaning up
 int clean_up(const int);
 // generate VAO, VBO, EBO...
@@ -47,9 +72,6 @@ void make_textures(const GLuint, const std::string&,
         const GLenum, const GLenum);
 
 // drawing rotating and scaling containers
-void lying_container(GLFWwindow*, const int = 0);
-void lying_container_loop(GLFWwindow*, const GLuint, const Shader&,
-        const std::vector<GLuint>&, const std::vector<std::string>&);
 void rotating_cube(GLFWwindow*, const int = 0);
 void rotating_cube_draw(GLFWwindow*, const std::vector<GLfloat>&,
         const std::vector<GLuint>&, const int);
@@ -57,46 +79,29 @@ void rotating_cube_loop(GLFWwindow*, const GLuint, const Shader&,
         const std::vector<GLuint>&, const std::vector<std::string>&,
         const std::vector<glm::vec3>&, const int);
 
-
 // function to compute sizeof elements lying in the vector container
 template <class T>
 constexpr size_t size_of_elements(const std::vector<T> &v) {
     return v.size() * sizeof(T);
 }
 
+// process user input
+void process_input(GLFWwindow*, const std::string&);
+// display menu of possible actions and process them
+void show_menu(GLFWwindow*, const std::string&);
+
 // here goes the main()
 int main(int argc, char *argv[]) try {
+
     static constexpr GLuint width {800}, height {600};
+    last_x = width >> 1;
+    last_y = height >> 1;
     GLFWwindow *win = init(width, height);
 
-    static constexpr char num_options {'2'};
-    if (argc > 1) {
-        const std::string s {argv[1]};
-        const char inp_char {s[0]};
-        if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
-            switch (inp_char - '0') {
-                case 1:
-                    rotating_cube(win);
-                    break;
-                case 2:
-                    rotating_cube(win, 2);
-                    break;
-                case 0:
-                default:
-                    lying_container(win);
-            }
-        } else {
-            std::cerr << "Wrong input: drawing default rotating box\n";
-            lying_container(win);
-        }
-    } else {
-        std::cout << "Note: the program can be run as follows:\n" <<
-            argv[0] << " int_param, where int_param is:\n" <<
-            "0:\t\"lying\" box (default)\n" <<
-            "1:\trotating box\n" <<
-            "2:\trotating boxes (rotating every 3rd box)\n";
-        lying_container(win);
-    }
+    if (argc > 1)
+        process_input(win, argv[1]);
+    else
+        show_menu(win, argv[0]);
 
     // clean up and exit properly
     return clean_up(0);
@@ -110,6 +115,48 @@ int main(int argc, char *argv[]) try {
 } catch (...) {
     std::cerr << "Unknown exception\n";
     return clean_up(3);
+}
+
+/*
+ * Process user input
+ */
+void process_input(GLFWwindow *win, const std::string &inp) {
+    static constexpr char num_options {'3'};
+    const std::string s {inp};
+    const char inp_char {s[0]};
+    if (s.length() == 1 && inp_char >= '0' && inp_char <= num_options) {
+        switch (inp_char - '0') {
+            case 1:
+                rotating_cube(win, 1);
+                break;
+            case 2:
+                rotating_cube(win, 2);
+                break;
+            case 3:
+                rotating_cube(win, 3);
+                break;
+            case 0:
+            default:
+                rotating_cube(win);
+        }
+    } else {
+        std::cerr << "Wrong input: drawing default rotating cube\n";
+        rotating_cube(win);
+    }
+}
+
+/*
+ * Display a menu of possible actions
+ */
+void show_menu(GLFWwindow *win, const std::string &prog_name) {
+    std::cout << "Note: the program can be run as follows:\n" <<
+        prog_name << " int_param, where int_param is:\n" <<
+        "0:\trotating cube (default)\n" <<
+        "1:\tcubes rotating on a \"sphere\"\n" <<
+        "2:\tcamera moving with keys (WASD or arrow keys) and mouse" <<
+        " (left-right and up-down movement)\n" <<
+        "3:\tadded zooming (scrolling the mouse wheel, can be buggy...)\n";
+    rotating_cube(win);
 }
 
 /*
@@ -138,8 +185,13 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     if (glewInit() != GLEW_OK)
         throw std::runtime_error {"Failed to initialize GLEW"};
 
-    // register the callback
+    // register keyboard callback
     glfwSetKeyCallback(win, key_callback);
+    // set up mouse callback
+    glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(win, mouse_callback);
+    // scrolling
+    glfwSetScrollCallback(win, scroll_callback);
 
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
@@ -155,8 +207,53 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
  */
 void key_callback(GLFWwindow *win, const int key, const int,
         const int action, const int) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(win, GL_TRUE);
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)
+            glfwSetWindowShouldClose(win, GL_TRUE);
+        else
+            keys[key] = true;
+    } else if (action == GLFW_RELEASE) {
+        keys[key] = false;
+    }
+}
+
+/*
+ * Call this function whenever pointer (mouse) moves
+ */
+void mouse_callback(GLFWwindow*, const double xpos, const double ypos) {
+    if (first_mouse_move) {
+        last_x = xpos;
+        last_y = ypos;
+        first_mouse_move = false;
+    }
+
+    const GLfloat xoffset = xpos - last_x, yoffset = last_y - ypos;
+
+    last_x = xpos;
+    last_y = ypos;
+
+    main_cam.process_mouse_move(xoffset, yoffset);
+}
+
+/*
+ * Call this function during scrolling
+ */
+void scroll_callback(GLFWwindow*, const double, const double yoffset) {
+    main_cam.process_scroll(yoffset);
+}
+
+/*
+ * Function for smooth movement of the camera
+ */
+void do_movement() {
+    if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP])
+        main_cam.process_keyboard(Camera::forward_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN])
+        main_cam.process_keyboard(Camera::backward_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
+        main_cam.process_keyboard(Camera::left_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
+        main_cam.process_keyboard(Camera::right_dir, delta_frame_time);
 }
 
 /*
@@ -228,50 +325,6 @@ void make_textures(const GLuint tex, const std::string& img_fn,
     glGenerateMipmap(GL_TEXTURE_2D);
     SOIL_free_image_data(img);
     glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-// draw a "lying" container with a smiley
-void lying_container(GLFWwindow *win, const int) {
-    // define vertices and indices for the container
-    static const std::vector<GLfloat> vertices {
-        // positions   // texture coords
-        0.5,  0.5, 0,    1, 1, // top-right
-        0.5, -0.5, 0,    1, 0, // bottom-right
-       -0.5, -0.5, 0,    0, 0, // bottom-left
-       -0.5,  0.5, 0,    0, 1, // top-left
-    };
-    static const std::vector<GLuint> indices {
-        0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
-    };
-
-    const Shader shad {shad_path + "transform_cont2.vs",
-        shad_path + "transform_cont2.frag"};
-
-    const std::vector<std::string> tex_imgs {tex_path + "container.jpg",
-        tex_path + "awesomeface.png"};
-    const std::vector<std::string> frag_uni_tex {"in_tex1", "in_tex2"};
-    assert(tex_imgs.size() == frag_uni_tex.size());
-
-    // generate and build objects
-    GLuint VAO, VBO, EBO;
-    gen_objects(&VAO, &VBO, &EBO);
-    make_objects(VAO, VBO, EBO, vertices, indices);
-
-    // Load and create textures
-    const auto num_imgs = tex_imgs.size();
-    std::vector<GLuint> textures(num_imgs);
-    gen_textures(textures);
-
-    for (size_t i {0}; i < num_imgs; ++i)
-        make_textures(textures[i], tex_imgs[i], GL_REPEAT, GL_LINEAR);
-
-    lying_container_loop(win, VAO, shad, textures, frag_uni_tex);
-
-    // cleaning up
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
 }
 
 // draw a rotating cube with a smiley
@@ -354,7 +407,9 @@ void rotating_cube_draw(GLFWwindow *win, const std::vector<GLfloat> &vertices,
 
     // cubes positions
     std::vector<glm::vec3> cubes_pos;
-    if (option == 2)
+    if (option == 0)
+        cubes_pos = { glm::vec3{ 0.0,  0.0,  0.0} };
+    else
         cubes_pos = {
             glm::vec3{ 0.0,  0.0,  0.0},
             glm::vec3{ 2.0,  5.0, -15.0},
@@ -367,8 +422,6 @@ void rotating_cube_draw(GLFWwindow *win, const std::vector<GLfloat> &vertices,
             glm::vec3{ 1.5,  0.2, -1.5},
             glm::vec3{-1.3,  1.0, -1.5}
         };
-    else
-        cubes_pos = { glm::vec3{ 0.0,  0.0,  0.0} };
 
     rotating_cube_loop(win, VAO, shad, textures, frag_uni_tex, cubes_pos,
             option);
@@ -383,20 +436,36 @@ void rotating_cube_draw(GLFWwindow *win, const std::vector<GLfloat> &vertices,
 void rotating_cube_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
         const std::vector<GLuint> &textures,
         const std::vector<std::string> &tex_frag_uni,
-        const std::vector<glm::vec3> &cubes_pos, const int) {
-    // get window size
+        const std::vector<glm::vec3> &cubes_pos, const int option) {
     int win_w, win_h;
-    glfwGetFramebufferSize(win, &win_w, &win_h);
-    // view matrix
-    const glm::mat4 view = glm::translate(glm::mat4{}, glm::vec3(0, 0, -2));
+    glfwGetFramebufferSize(win, &win_w, &win_h); // get window size
     // use window size for the projection matrix
-    const auto proj = glm::perspective(glm::radians(60.0f),
-            float(win_w) / win_h, 0.1f, 100.0f);
+    glm::mat4 proj;
+    if (option < 4)
+        proj = glm::perspective(glm::radians(60.0f), float(win_w) / win_h,
+                0.1f, 100.0f);
     const auto model_loc = glGetUniformLocation(shad.id(), "model");
     const auto view_loc  = glGetUniformLocation(shad.id(), "view");
     const auto proj_loc  = glGetUniformLocation(shad.id(), "proj");
+    const GLfloat view_radius = 10;
     while (!glfwWindowShouldClose(win)) {
         glfwPollEvents();
+        const auto curr_time = glfwGetTime();
+        delta_frame_time = curr_time - last_frame_time;
+        last_frame_time  = curr_time;
+        glm::mat4 view; // lookat view matrix
+        if (option >= 2) { // a lot of crutches...
+            do_movement();
+            view = main_cam.view_matrix();
+            if (option == 3)
+                proj = glm::perspective(main_cam.zoom(), float(win_w) / win_h,
+                        0.1f, 100.0f);
+        } else {
+            const auto cam_x = sin(curr_time) * view_radius;
+            const auto cam_z = cos(curr_time) * view_radius;
+            view = glm::lookAt(glm::vec3{cam_x, 0, cam_z},
+                    glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0});
+        }
         glClearColor(0.6, 0.7, 0.2, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // bind textures using texture units
@@ -406,8 +475,7 @@ void rotating_cube_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
             glUniform1i(glGetUniformLocation(shad.id(),
                         tex_frag_uni[i].c_str()), i);
         }
-        // activate shader
-        shad.use();
+        shad.use(); // activate shader
         // set matrices
         glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj));
@@ -416,55 +484,11 @@ void rotating_cube_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
         glm::mat4 model;
         for (GLuint i = 0; i < cubes_pos.size(); ++i) {
             model = glm::translate(glm::mat4{}, cubes_pos[i]);
-            model = glm::rotate(model, glm::radians(float(glfwGetTime()) * 50 +
+            model = glm::rotate(model, glm::radians(float(curr_time) * 50 +
                         20 * i) * (i % 3 == 0), glm::vec3{1, 0.3, 0.5});
             glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
             glDrawArrays(GL_TRIANGLES, 0 , 36);
         }
-        glBindVertexArray(0);
-        glfwSwapBuffers(win);
-    }
-}
-
-// game loop for "lying" container
-void lying_container_loop(GLFWwindow *win, const GLuint VAO, const Shader &shad,
-        const std::vector<GLuint> &textures,
-        const std::vector<std::string> &tex_frag_uni) {
-    int win_w, win_h;
-    glfwGetFramebufferSize(win, &win_w, &win_h);
-
-    // define matrices
-    const auto model = glm::rotate(glm::mat4{}, glm::radians(-55.0f),
-            glm::vec3(1, 0, 0));
-    const auto view = glm::translate(glm::mat4{}, glm::vec3{0, 0, -3});
-    const auto proj = glm::perspective(45.0f, float(win_w) / win_h,
-            0.1f, 100.0f);
-
-    const auto model_loc = glGetUniformLocation(shad.id(), "model");
-    const auto view_loc  = glGetUniformLocation(shad.id(), "view");
-    const auto proj_loc  = glGetUniformLocation(shad.id(), "proj");
-
-    while (!glfwWindowShouldClose(win)) {
-        glfwPollEvents();
-        glClearColor(0.5, 0.8, 0.2, 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // bind textures using texture units
-        for (size_t i {0}; i < textures.size(); ++i) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures[i]);
-            glUniform1i(glGetUniformLocation(shad.id(),
-                        tex_frag_uni[i].c_str()), i);
-        }
-        // activate shader
-        shad.use();
-        // set matrices
-        glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj));
-
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
         glBindVertexArray(0);
         glfwSwapBuffers(win);
     }

@@ -91,11 +91,9 @@ void drawing_rect(GLFWwindow*, const GLuint, const GLfloat*, const GLuint,
 
 // here goes the main()
 int main(int argc, char *argv[]) try {
-
     static constexpr GLuint width {800}, height {600};
     // make a window
     GLFWwindow *win = init(width, height);
-
     /*
      * Build a shader program from two shaders: vertex and fragment.
      * The corresponding shaders are given as GLchar*
@@ -104,7 +102,6 @@ int main(int argc, char *argv[]) try {
             make_shader(GL_VERTEX_SHADER, vert_shad_src),
             make_shader(GL_FRAGMENT_SHADER, frag_shad_src)
             );
-
     static constexpr char num_options {'4'};
     if (argc > 1) {
         const std::string s {argv[1]};
@@ -139,10 +136,8 @@ int main(int argc, char *argv[]) try {
             "4:\t two triangles (different shaders)\n";
         draw_triangle(win, shad_prog);
     }
-
     // clean up and exit properly
     return clean_up(0);
-
 } catch (const Bad_init &e) {
     std::cerr << e.what() << '\n';
     return clean_up(1);
