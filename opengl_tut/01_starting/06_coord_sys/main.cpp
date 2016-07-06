@@ -127,7 +127,8 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Triangle", nullptr, nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Coordinate systems", nullptr,
+            nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
