@@ -1,6 +1,6 @@
 /*
- * Following tutorial on OpenGL (textures):
- * http://learnopengl.com/#!Getting-started/Textures
+ * Following tutorial on OpenGL (transformations):
+ * http://learnopengl.com/#!Getting-started/Transformations
  *
  * Introducing the use of matrices for transformations:
  *      translation, rotation, scaling

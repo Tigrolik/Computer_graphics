@@ -1,5 +1,5 @@
 /*
- * Following tutorial on OpenGL (textures):
+ * Following tutorial on OpenGL (colors):
  * http://learnopengl.com/#!Lighting/Colors
  *
  * Coloring a box as if illuminated by a lamp.

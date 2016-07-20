@@ -1,5 +1,5 @@
 /*
- * Following tutorial on OpenGL (textures):
+ * Following tutorial on OpenGL (camera):
  * http://learnopengl.com/#!Getting-started/Camera
  *
  * Experimenting with view matrix. Enabling user interaction with "camera" via

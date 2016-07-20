@@ -1,5 +1,5 @@
 /*
- * Following tutorial on OpenGL (textures):
+ * Following tutorial on OpenGL (coordinate systems):
  * http://learnopengl.com/#!Getting-started/Coordinate-Systems
  *
  * Working with coordinate systems, drawing 3D boxes and applying

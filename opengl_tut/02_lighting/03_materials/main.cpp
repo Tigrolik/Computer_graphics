@@ -1,9 +1,8 @@
 /*
- * Following tutorial on OpenGL (basic lighting):
- * http://learnopengl.com/#!Lighting/Basic-Lighting
+ * Following tutorial on OpenGL (materials):
+ * http://learnopengl.com/#!Lighting/Materials
  *
- * Practicing ambient, diffused and specular lightings (combining them into a
- * Phong lighting). Also showing a variant with Gouraud lighting
+ * Demonstrating how materials can be expressed via colors
  *
  */
 
@@ -65,18 +64,17 @@ void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
         const bool, const int);
 
 // drawing colored object and "lamp" box with various lighting
-void ambient_cube(GLFWwindow*);
 void diffuse_light_cube(GLFWwindow*, const int = 0);
-void draw_objects(GLFWwindow*, const std::vector<GLfloat>&, const Shader&,
-        const int = 0, const bool = false);
+void draw_objects(GLFWwindow*, const std::vector<GLfloat>&, const int = 0,
+        const bool = false);
 void light_obj_loop(GLFWwindow*, const std::vector<GLuint>&,
-        const std::vector<Shader>&, const bool);
+        const std::vector<Shader>&, const bool, const int);
 void draw_light_obj(const Shader&, const GLuint, const glm::mat4&,
-        const glm::mat4&, const glm::vec3&);
+        const glm::mat4&, const glm::vec3&, const int);
 void draw_lamp(const Shader&, const GLuint, const glm::mat4&,
         const glm::mat4&, const glm::vec3&);
 void common_draw_light_obj(const Shader&, const GLuint, const glm::mat4&,
-        const glm::mat4&, const glm::vec3&, const int = 1);
+        const glm::mat4&, const glm::vec3&, const int, const int);
 
 // function to compute sizeof elements lying in the vector container
 template <class T>
@@ -99,7 +97,8 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program is simply a demonstration of two objects:\n" <<
+        "This program demonstrates how material properties can be simulated" <<
+        " with colors. The scene contains two objects:\n" <<
         "lamp (white cube) and illuminated object (colored cube)\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "keys W/S - up and down, arrows up/down - depth\n" <<
@@ -129,33 +128,24 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'6'};
+    static constexpr char num_options {'3'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
-            case 5:
-                diffuse_light_cube(win, 4);
-                break;
-            case 4:
-                diffuse_light_cube(win, 3);
-                break;
-            case 3:
+            case 2:
                 diffuse_light_cube(win, 2);
                 break;
-            case 2:
-                diffuse_light_cube(win, 1);
-                break;
             case 1:
-                diffuse_light_cube(win, 0);
+                diffuse_light_cube(win, 1);
                 break;
             case 0:
             default:
-                ambient_cube(win);
+                diffuse_light_cube(win, 0);
         }
     } else {
-        std::cerr << "Wrong input: drawing default ambient cube\n";
-        ambient_cube(win);
+        std::cerr << "Wrong input: drawing default cube\n";
+        diffuse_light_cube(win, 0);
     }
 }
 
@@ -165,13 +155,10 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tbox (and \"lamp\") with ambiend lighting (default)\n" <<
-        "1:\tbox with ambient + diffused lighting\n" <<
-        "2:\tbox with phong (amb + diff + spec) lighting\n" <<
-        "3:\tbox with \"lamp\" rotating\n" <<
-        "4:\tthe same as (3) but using view space in shaders\n" <<
-        "5:\tbox with \"lamp\" rotating with Gouraud shading\n";
-    ambient_cube(win);
+        "0:\tcube with \"bronze\" material (default)\n" <<
+        "1:\tcube with lighting (\"material\") changing with time\n" <<
+        "2:\tcube with cyan plastic lighting\n";
+    diffuse_light_cube(win, 0);
 }
 
 /*
@@ -189,7 +176,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Lighting Modes", nullptr,
+    GLFWwindow *win = glfwCreateWindow(w, h, "Materials", nullptr,
             nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
@@ -324,58 +311,6 @@ void make_objects(const GLuint VAO, const GLuint VBO,
     glBindVertexArray(0);
 }
 
-// draw a box enlighted with ambient light
-void ambient_cube(GLFWwindow *win) {
-    static const std::vector<GLfloat> vertices {
-       -0.5, -0.5, -0.5,
-        0.5, -0.5, -0.5,
-        0.5,  0.5, -0.5,
-        0.5,  0.5, -0.5,
-       -0.5,  0.5, -0.5,
-       -0.5, -0.5, -0.5,
-
-       -0.5, -0.5,  0.5,
-        0.5, -0.5,  0.5,
-        0.5,  0.5,  0.5,
-        0.5,  0.5,  0.5,
-       -0.5,  0.5,  0.5,
-       -0.5, -0.5,  0.5,
-
-       -0.5,  0.5,  0.5,
-       -0.5,  0.5, -0.5,
-       -0.5, -0.5, -0.5,
-       -0.5, -0.5, -0.5,
-       -0.5, -0.5,  0.5,
-       -0.5,  0.5,  0.5,
-
-        0.5,  0.5,  0.5,
-        0.5,  0.5, -0.5,
-        0.5, -0.5, -0.5,
-        0.5, -0.5, -0.5,
-        0.5, -0.5,  0.5,
-        0.5,  0.5,  0.5,
-
-       -0.5, -0.5, -0.5,
-        0.5, -0.5, -0.5,
-        0.5, -0.5,  0.5,
-        0.5, -0.5,  0.5,
-       -0.5, -0.5,  0.5,
-       -0.5, -0.5, -0.5,
-
-       -0.5,  0.5, -0.5,
-        0.5,  0.5, -0.5,
-        0.5,  0.5,  0.5,
-        0.5,  0.5,  0.5,
-       -0.5,  0.5,  0.5,
-       -0.5,  0.5, -0.5,
-    };
-
-    const Shader light_shader {shad_path + "light_shader_01.vs",
-        shad_path + "light_shader_amb_01.frag"};
-
-    draw_objects(win, vertices, light_shader, 0);
-}
-
 // draw a box enlighted by a diffused light
 void diffuse_light_cube(GLFWwindow *win, const int option) {
     static const std::vector<GLfloat> vertices {
@@ -421,38 +356,15 @@ void diffuse_light_cube(GLFWwindow *win, const int option) {
         -0.5,  0.5,  0.5,  0,  1,  0,
         -0.5,  0.5, -0.5,  0,  1,  0
     };
-
-    switch (option) {
-        case 4:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_gouraud_01.vs",
-                    shad_path + "light_shader_gouraud_01.frag"}, 1, true);
-        case 3:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_specular_02.vs",
-                    shad_path + "light_shader_specular_02.frag"}, 1, true);
-        case 2:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_specular_01.vs",
-                    shad_path + "light_shader_specular_01.frag"}, 1, true);
-        case 1:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_specular_01.vs",
-                    shad_path + "light_shader_specular_01.frag"}, 1);
-            break;
-        case 0:
-        default:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_diffuse_01.vs",
-                    shad_path + "light_shader_diffuse_01.frag"}, 1);
-            break;
-
-    }
+    draw_objects(win, vertices, option);
 }
 
 // helper function to draw lighting objects
 void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &vertices,
-        const Shader &obj_shader, const int option, const bool rot_lamp) {
+        const int option, const bool rot_lamp) {
+
+    const Shader obj_shader {shad_path + "light_shader_diffuse_01.vs",
+            shad_path + "light_shader_mater_01.frag"};
     const Shader lamp_shader {shad_path + "lamp_shader_01.vs",
         shad_path + "lamp_shader_01.frag"};
 
@@ -462,27 +374,24 @@ void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &vertices,
     std::vector<GLuint> VBO_vec {VBO};
 
     gen_objects(&VAO_vec, &VBO_vec);
-    if (option == 0)
-        make_objects(VAO_vec[0], VBO_vec[0], vertices, true, 0);
-    else if (option == 1)
-        make_objects(VAO_vec[0], VBO_vec[0], vertices, true, 1);
+    make_objects(VAO_vec[0], VBO_vec[0], vertices, true, 1);
     make_objects(VAO_vec[1], VBO_vec[0], vertices, false, 0);
 
     light_obj_loop(win, VAO_vec, std::vector<Shader> {obj_shader, lamp_shader},
-            rot_lamp);
+            rot_lamp, option);
 }
 
 // main loop for drawing light objects
 void light_obj_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
-        const std::vector<Shader> &shad, const bool rot_lamp) {
+        const std::vector<Shader> &shad, const bool rot_lamp, const int opt) {
     int win_w, win_h;
     glfwGetFramebufferSize(win, &win_w, &win_h);
     const auto win_asp = float(win_w) / win_h;
 
     glm::vec3 lamp_pos {1, 0, 2.5};
     const std::function<void(const Shader&, const GLuint&, const glm::mat4&,
-            const glm::mat4&, const glm::vec3&, const int)> draw_fun =
-        common_draw_light_obj;
+            const glm::mat4&, const glm::vec3&, const int, const int)>
+        draw_fun = common_draw_light_obj;
 
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
@@ -504,7 +413,7 @@ void light_obj_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
                 100.0f);
 
         for (int i = 0; i < 2; ++i)
-            draw_fun(shad[i], VAO[i], view, proj, lamp_pos, i + 1);
+            draw_fun(shad[i], VAO[i], view, proj, lamp_pos, i, opt);
 
         glfwSwapBuffers(win);
     }
@@ -512,30 +421,58 @@ void light_obj_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
 
 // helper function for drawing colored object
 void draw_light_obj(const Shader &shad, const GLuint VAO, const glm::mat4 &view,
-        const glm::mat4 &proj, const glm::vec3 &lamp_pos) {
+        const glm::mat4 &proj, const glm::vec3 &lamp_pos, const int option) {
     shad.use();
+    const auto idx = shad.id();
 
-    const GLint obj_color_loc = glGetUniformLocation(shad.id(),
-            "object_color");
-    const GLint light_color_loc = glGetUniformLocation(shad.id(),
-            "light_color");
-    const GLint light_pos_loc = glGetUniformLocation(shad.id(),
-            "light_pos");
-    const GLint view_pos_loc = glGetUniformLocation(shad.id(),
-            "view_pos");
-    glUniform3f(obj_color_loc, 1, 0.5, 0.31);
-    glUniform3f(light_color_loc, 1, 1, 1);
-    glUniform3f(light_pos_loc, lamp_pos.x, lamp_pos.y, lamp_pos.z);
-    glUniform3f(view_pos_loc, main_cam.pos().x, main_cam.pos().y,
-            main_cam.pos().z);
+    // positions
+    glUniform3f(glGetUniformLocation(idx, "light.pos"),
+            lamp_pos.x, lamp_pos.y, lamp_pos.z);
+    glUniform3f(glGetUniformLocation(idx, "view_pos"),
+            main_cam.pos().x, main_cam.pos().y, main_cam.pos().z);
 
-    const auto model_loc = glGetUniformLocation(shad.id(), "model");
-    const auto view_loc  = glGetUniformLocation(shad.id(), "view");
-    const auto proj_loc  = glGetUniformLocation(shad.id(), "proj");
+    // color
+    auto light_color = glm::vec3{1, 1, 1};
+    if (option == 1) {
+        light_color.x = sin(glfwGetTime() * 2);
+        light_color.y = sin(glfwGetTime() * 0.7);
+        light_color.z = sin(glfwGetTime() * 1.3);
+    }
+    auto diffuse_color = light_color * glm::vec3{0.5};
+    auto amb_color = diffuse_color * glm::vec3{0.37};
+    if (option == 2) {
+        diffuse_color = glm::vec3{1};
+        amb_color = glm::vec3{1};
+    }
+
+    glUniform3f(glGetUniformLocation(idx, "light.ambient"),
+            amb_color.x, amb_color.y, amb_color.z);
+    glUniform3f(glGetUniformLocation(idx, "light.diffuse"),
+            diffuse_color.x, diffuse_color.y, diffuse_color.z);
+    glUniform3f(glGetUniformLocation(idx, "light.specular"), 1, 1, 1);
+
+    // material
+    if (option == 2) { // cyan plastic
+        glUniform3f(glGetUniformLocation(idx, "mater.ambient"), 0, 0.1, 0.6);
+        glUniform3f(glGetUniformLocation(idx, "mater.diffuse"), 0, 0.50980392,
+                0.50980392);
+        glUniform3f(glGetUniformLocation(idx, "mater.specular"), 0.50196078,
+                0.50196078, 0.50196078);
+    } else {
+        glUniform3f(glGetUniformLocation(idx, "mater.ambient"), 1, 0.5, 0.31);
+        glUniform3f(glGetUniformLocation(idx, "mater.diffuse"), 1, 0.5, 0.31);
+        glUniform3f(glGetUniformLocation(idx, "mater.specular"), 0.5, 0.5, 0.5);
+    }
+    glUniform1f(glGetUniformLocation(idx, "mater.shininess"), 32);
+
+    // matrices
     glm::mat4 model;
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj));
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
+            glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
+            glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
+            glm::value_ptr(model));
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -565,9 +502,9 @@ void draw_lamp(const Shader &shad, const GLuint VAO, const glm::mat4 &view,
 // common helper function for drawing a light object (used for std::function)
 void common_draw_light_obj(const Shader &shad, const GLuint VAO,
         const glm::mat4 &view, const glm::mat4 &proj,
-        const glm::vec3 &lamp_pos, const int option) {
-    if (option == 1)
-        draw_light_obj(shad, VAO, view, proj, lamp_pos);
+        const glm::vec3 &lamp_pos, const int option, const int opt) {
+    if (option == 0)
+        draw_light_obj(shad, VAO, view, proj, lamp_pos, opt);
     else
         draw_lamp(shad, VAO, view, proj, lamp_pos);
 }
