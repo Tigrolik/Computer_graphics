@@ -24,6 +24,7 @@
 
 #include "PPM_lib.h"
 #include "Vec.h"
+#include "Mat.h"
 #include <algorithm>
 
 #include <stdexcept>
@@ -60,6 +61,7 @@ public:
     virtual double area() const { return 0; }
     void draw(RGB_Image &I, const RGB_Color &c = 255) const { doDraw(I, c); }
     void fill(RGB_Image &I, const RGB_Color &c = 255) const { doFill(I, c); }
+    void transform(const Algebra_lib::Mat<3, 3, double>&) { }
 private:
     virtual void doDraw(RGB_Image&, const RGB_Color&) const = 0;
     virtual void doFill(RGB_Image&, const RGB_Color&) const = 0;
@@ -97,6 +99,8 @@ public:
     double dist_to(const Point &o) const {
         return sqrt(sqr(x_ - o.x_) + sqr(y_ - o.y_));
     }
+
+    void transform(const Algebra_lib::Mat<3, 3, double>&);
 
 private:
     int x_;
@@ -161,6 +165,7 @@ public:
 
     double length() const override { return p1_.dist_to(p2_); }
 
+    void transform(const Algebra_lib::Mat<3, 3, double>&);
 private:
     Point p1_;
     Point p2_;
@@ -180,6 +185,13 @@ public:
 
     double length() const override { return (w_ + h_) << 1; }
     double area() const override { return w_ * h_; }
+
+    size_t width() const { return w_; }
+    size_t height() const { return h_; }
+
+    //void set_color(RGB_Image& I, const RGB_Color& C, const int x, const int y) {
+    //    I.set_color(x, y, C);
+    //}
 
 private:
     Point p_;
@@ -218,6 +230,14 @@ public:
     void fill_hs(RGB_Image&, const RGB_Color& = 255) const;
     void fill_bary(RGB_Image&, const RGB_Color& = 255) const;
 
+    Point& p1() { return p1_; }
+    const Point& p1() const { return p1_; }
+    Point& p2() { return p2_; }
+    const Point& p2() const { return p2_; }
+    Point& p3() { return p3_; }
+    const Point& p3() const { return p3_; }
+
+    void transform(const Algebra_lib::Mat<3, 3, double>&);
 private:
     Point p1_;
     Point p2_;

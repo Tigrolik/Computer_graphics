@@ -23,7 +23,7 @@ public:
     template <size_t M, class Comp>
     Vec(const Vec<M, Comp>&); // templated copy ctor: e.g., double to int
     //Vec(Vec&&) = default; // some problems with move ctor
-    template <size_t M, class Comp> // templated assingment operator
+    template <size_t M, class Comp> // templated assignment operator
     Vec& operator=(const Vec<M, Comp>&);
     ~Vec() = default;
 
@@ -152,28 +152,28 @@ inline bool operator!=(const Vec<N, Num> &v1, const Vec<M, Comp> &v2) {
 /*
  * ------------------ Vec arithmetic compound operators ------------------
  */
-// sum assingment: add a value to a vector
+// sum assignment: add a value to a vector
 template <size_t N, class Num> template <class Comp>
 inline Vec<N, Num>& Vec<N, Num>::operator+=(const Comp &rhs) {
     for (auto &a: A_) a += rhs;
     return *this;
 }
 
-// sum assingment: add a vector to a vector
+// sum assignment: add a vector to a vector
 template <size_t N, class Num> template <class Comp>
 inline Vec<N, Num>& Vec<N, Num>::operator+=(const Vec<N, Comp> &rhs) {
     for (auto i = N; i--; A_[i] += rhs[i]) { }
     return *this;
 }
 
-// difference assingment: subtract a value from a vector
+// difference assignment: subtract a value from a vector
 template <size_t N, class Num> template <class Comp>
 inline Vec<N, Num>& Vec<N, Num>::operator-=(const Comp &rhs) {
     for (auto &a: A_) a -= rhs;
     return *this;
 }
 
-// difference assingment: subtract a vector from a vector
+// difference assignment: subtract a vector from a vector
 template <size_t N, class Num> template <class Comp>
 inline Vec<N, Num>& Vec<N, Num>::operator-=(const Vec<N, Comp> &rhs) {
     for (auto i = N; i--; A_[i] -= rhs[i]) { }

@@ -11,6 +11,14 @@ Point& Point::operator=(const Point &o) {
     if (this != &o) { x_ = o.getX(); y_ = o.getY(); } return *this;
 }
 
+void Point::transform(const Algebra_lib::Mat<3, 3, double>& M) {
+    using namespace Algebra_lib;
+    Vec<3, double> v {double(x_), double(y_), 1.0};
+    v = v * M;
+    x_ = int(v.x());
+    y_ = int(v.y());
+}
+
 void Point::doDraw(RGB_Image &I, const RGB_Color &c) const {
     if (x_ >= 0 && x_ < int(I.width()) && y_ >= 0 && y_ < int(I.height()))
         I[x_][y_] = c.color();
@@ -66,6 +74,11 @@ Line& Line::operator=(const Line &o) {
         p2_ = o.p2_;
     }
     return *this;
+}
+
+void Line::transform(const Algebra_lib::Mat<3, 3, double>& M) {
+    p1_.transform(M);
+    p2_.transform(M);
 }
 
 /*
@@ -327,6 +340,12 @@ double Triangle::area() const {
             (p3_.x() - p1_.x()) * (p2_.y() - p1_.y())) * 0.5;
 }
 
+void Triangle::transform(const Algebra_lib::Mat<3, 3, double>& M) {
+    p1_.transform(M);
+    p2_.transform(M);
+    p3_.transform(M);
+}
+
 void Triangle::doDraw(RGB_Image &I, const RGB_Color &c) const {
     Line{p1_, p2_}.draw(I, c);
     Line{p2_, p3_}.draw(I, c);
@@ -437,17 +456,17 @@ void Triangle::fill_hs(RGB_Image &I, const RGB_Color &C) const {
 /*
  * Calculate barycentric coordinates
  */
-Vec<3, double> bary(const Point &p1, const Point &p2, const Point &p3,
-        const Point &p) {
+Algebra_lib::Vec<3, double> bary(const Point &p1, const Point &p2,
+        const Point &p3, const Point &p) {
     const int x1 {p1.x()}, y1 {p1.y()}, x2 {p2.x()}, y2 {p2.y()};
     const int x3 {p3.x()}, y3 {p3.y()}, x {p.x()}, y {p.y()};
     const int dx13 {x1 - x3}, dx32 {x3 - x2}, dy13 {y1 - y3}, dy23 {y2 - y3};
     const double z = dy23 * dx13 + dx32 * dy13;
-    if (std::abs(z) < 0.5) return {-1, 1, 1};
+    if (std::abs(z) < 0.5) return Algebra_lib::Vec<3, double>{-1, 1, 1};
     const int dx3 {x - x3}, dy3 {y - y3};
     const double lam1 {(dy23 * dx3 + dx32 * dy3) / z};
     const double lam2 {(dx13 * dy3 - dy13 * dx3 ) / z};
-    return {1 - lam1 - lam2, lam1, lam2};
+    return Algebra_lib::Vec<3, double>{1 - lam1 - lam2, lam1, lam2};
 }
 
 void Triangle::fill_bary(RGB_Image &I, const RGB_Color &C) const {
@@ -459,7 +478,7 @@ void Triangle::fill_bary(RGB_Image &I, const RGB_Color &C) const {
     const auto clr = C.color();
     for (auto y = ymin; y <= ymax; ++y)
         for (auto x = xmin; x <= xmax; ++x) {
-            Vec<3, double> vb {bary(p1_, p2_, p3_, Point{x, y})};
+            Algebra_lib::Vec<3, double> vb {bary(p1_, p2_, p3_, Point{x, y})};
             if (vb.x() >= 0 && vb.y() >= 0 && vb.z() >= 0)
                 I[x][y] = clr;
         }

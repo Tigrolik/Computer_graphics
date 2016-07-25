@@ -54,8 +54,8 @@ RGB_Image::RGB_Image(const std::string &fn): bgcolor_{0}, I_{} {
 }
 
 RGB_Image::RGB_Image(const GS_Image &R, const GS_Image &G, const GS_Image &B):
-    RGB_Image(R.width(), R.height(),gray2rgb(R.bgcolor(), G.bgcolor(),
-                B.bgcolor())) {
+    RGB_Image(R.width(), R.height(),
+            gray2rgb(R.bgcolor(), G.bgcolor(), B.bgcolor())) {
         const auto w = width(), h = height();
         // check images for equal size
         if (w != G.width() || w != B.width() ||

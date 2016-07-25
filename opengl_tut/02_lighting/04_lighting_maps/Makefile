@@ -18,7 +18,11 @@ COMP_OPTIONS = -m64 -Wall -Wextra -Wshadow -pedantic -Werror
 CXXFLAGS = -std=c++11 -Weffc++ $(COMP_OPTIONS)
 DEBUG_FLAGS = -O0 -g -D _DEBUG
 RELEASE_FLAGS = -O3 -D NDEBUG
-LIBS =
+
+# Flags for OpenGL (added -lSOIL for images)
+LIBS = -lGL -lGLU -lGLEW -lGLEW -lglfw -lXxf86vm -ldl -lX11 -lpthread\
+	-lXrandr -lXi -lXinerama -lXcursor -lSOIL
+
 
 SOURCES := $(wildcard *.cpp)
 TARGET := main
@@ -30,7 +34,7 @@ release:
 	$(CXX) $(SOURCES) $(CXXFLAGS) $(RELEASE_FLAGS) $(LIBS) -o $(TARGET)
 
 clean:
-	@-rm -f $(TARGET) *.ppm
+	@-rm -f $(TARGET)
 
 distclean: clean
 	@-rm -f *~
