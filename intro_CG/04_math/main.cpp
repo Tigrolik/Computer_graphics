@@ -117,6 +117,7 @@ PPM_lib::RGB_Color interp_rgb_color(const PPM_lib::RGB_Image& I,
     const PPM_lib::RGB_Color c2 = I.color(p2.x(), p2.y());
     const PPM_lib::RGB_Color c3 = I.color(p3.x(), p3.y());
     const PPM_lib::RGB_Color c4 = I.color(p4.x(), p4.y());
+    //std::cout << +c1.red() << '\n';
 
     const double val_r1 = (max_x - x) * c1.red() + (x - min_x) * c2.red();
     const double val_r2 = (max_x - x) * c4.red() + (x - min_x) * c3.red();
@@ -134,20 +135,22 @@ PPM_lib::RGB_Color interp_rgb_color(const PPM_lib::RGB_Image& I,
 
 void fill_rect(const PPM_lib::Rectangle& R, PPM_lib::RGB_Image& img,
         const PPM_lib::RGB_Image& I) {
-    const auto w = I.width(), h = I.height();
-    const auto rw = R.width(), rh = R.height();
+    const int w = I.width(), h = I.height();
+    const int rw = R.width(), rh = R.height();
     std::cout << rw << ' ' << rh << '\n';
     const double xq = w / double(rw);
     const double yq = h / double(rh);
     using namespace PPM_lib;
-    for (size_t i {0}; i < rw - 1; ++i)
-        for (size_t j {0}; j < rh - 1; ++j) {
+    for (int i {0}; i < rw; ++i)
+        for (int j {0}; j < rh; ++j) {
             const double iq = xq * i, jq = yq * j;
             const int i1 = int(iq), i2 = i1 + 1;
             const int j1 = int(jq), j2 = j1 + 1;
-            PPM_lib::RGB_Color c = interp_rgb_color(I, Point{i1, j1},
-                    Point{i2, j1}, Point{i2, j2}, Point{i1, j2}, iq, jq);
-            img.set_color(i, j, c);
+            if (i2 < w && j2 < h) {
+                PPM_lib::RGB_Color c = interp_rgb_color(I, Point{i1, j1},
+                        Point{i2, j1}, Point{i2, j2}, Point{i1, j2}, iq, jq);
+                img.set_color(i, j, c);
+            }
         }
 }
 
@@ -200,7 +203,7 @@ void test_insert_image() {
     const auto img_w = J.width(), img_h = J.height();
     std::cout << img_w << ' ' << img_h << '\n';
     //insert_image(I, J);
-    PPM_lib::Rectangle r {0, 0, img_w / 2, img_h / 2};
+    PPM_lib::Rectangle r {0, 0, img_w * 2, img_h * 2};
     fill_rect(r, I, J);
 
     I.write_to("img.ppm");
