@@ -59,8 +59,12 @@ public:
     virtual ~Shape() { }
     virtual double length() const { return 0; } // length, perimeter...
     virtual double area() const { return 0; }
-    void draw(RGB_Image &I, const RGB_Color &c = 255) const { doDraw(I, c); }
-    void fill(RGB_Image &I, const RGB_Color &c = 255) const { doFill(I, c); }
+    void draw(RGB_Image &I, const RGB_Color &c = {255, 255, 255}) const {
+        doDraw(I, c);
+    }
+    void fill(RGB_Image &I, const RGB_Color &c = {255, 255, 255}) const{
+        doFill(I, c);
+    }
     void transform(const Algebra_lib::Mat<3, 3, double>&) { }
 private:
     virtual void doDraw(RGB_Image&, const RGB_Color&) const = 0;

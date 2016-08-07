@@ -493,7 +493,7 @@ inline Mat<N, N, double> invert_transpose(const Mat<N, N, Num> &M) {
     for (size_t i {0}; i < N; ++i)
         for (size_t j {0}; j < N; ++j)
             res[i][j] = det(mat_minor(M, i, j)) * ((i + j) & 1 ? -1 : 1);
-    return res / (res[0] * M[0]);
+    return res / dot(res[0], M[0]);
 }
 /* --- end additional methods and functions --- */
 
