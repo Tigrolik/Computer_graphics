@@ -1,3 +1,6 @@
 This repository contains codes I have used for learning computer graphics.
 All the code is created in Linux environment and C++ language (compiler g++
 version 5.4.0)
+
+Usual way to test: open the main.cpp file, go to the main() function, uncomment
+the line for testing, compile (make) and run.

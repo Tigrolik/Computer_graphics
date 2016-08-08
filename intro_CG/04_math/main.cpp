@@ -110,7 +110,6 @@ Mat3d points_to_points(const std::vector<PPM_lib::Point> &vp1,
     const auto M1_inv = invert_transform_mat(M1);
     const auto M2 = unit_square_to_points(vp2);
     return M1_inv * M2;
-    //return M2 * M1_inv ;
 }
 
 // transform a triangle
@@ -181,25 +180,6 @@ PPM_lib::RGB_Color interp_rgb_color(const PPM_lib::RGB_Image& I,
     return PPM_lib::RGB_Color{val_r, val_g, val_b};
 }
 
-// fill a rectangular area with image
-void fill_rect(const PPM_lib::Rectangle& R, PPM_lib::RGB_Image& img,
-        const PPM_lib::RGB_Image& I) {
-    const int w = I.width(), h = I.height();
-    const int rw = R.width(), rh = R.height();
-    const double xq = w / double(rw);
-    const double yq = h / double(rh);
-    using namespace PPM_lib;
-    for (int i {0}; i < rw - rw / w; ++i)
-        for (int j {0}; j < rh - rh / h; ++j) {
-            const double iq = xq * i, jq = yq * j;
-            const int i1 = int(iq), i2 = i1 + 1;
-            const int j1 = int(jq), j2 = j1 + 1;
-            PPM_lib::RGB_Color c = interp_rgb_color(I, Point{i1, j1},
-                    Point{i2, j1}, Point{i2, j2}, Point{i1, j2}, iq, jq);
-            img.set_color(i, j, c);
-        }
-}
-
 // test matrix transformations
 void test_transform() {
     using namespace PPM_lib;
@@ -238,20 +218,6 @@ void test_transform() {
     t1.fill(I, Color_name::red); t1.draw(I, Color_name::red);
 
     I.write_to("transformations.ppm");
-}
-
-void test_insert_image() {
-    using namespace PPM_lib;
-    constexpr int w {1600}, h {1200};
-    RGB_Image I {w, h};
-
-    RGB_Image J {"../imgs/baboon.ppm"};
-    const auto img_w = J.width(), img_h = J.height();
-    //insert_image(I, J);
-    PPM_lib::Rectangle r {0, 0, img_w * 3, img_h * 3};
-    fill_rect(r, I, J);
-
-    I.write_to("img.ppm");
 }
 
 void test_points_transform() {
@@ -321,44 +287,55 @@ PPM_lib::Point point_in_poly(const std::vector<PPM_lib::Point> vp,
     return PPM_lib::Point{std::round(x_idx), std::round(y_idx)};
 }
 
-void test_poly_scan() {
-    using namespace PPM_lib;
-    constexpr int w {1600}, h {1200};
-    RGB_Image I {w, h};
+/* --- Interpolation --- */
 
-    Point p1 {10, 10}, p2 {120, 80}, p3 {150, 130}, p4 {45, 270};
-    std::vector<Point> vp1 {p1, p2, p3, p4};
-    Polygon{vp1}.draw(I);
-
-    const int x1 = vp1[0].x(), x2 = vp1[1].x(), x3 = vp1[2].x(), x4 =
-        vp1[3].x();
-    const int y1 = vp1[0].y(), y2 = vp1[1].y(), y3 = vp1[2].y(), y4 =
-        vp1[3].y();
-    const int dx1 = x2 - x1, dx2 = x3 - x4, dx3 = x4 - x1, dx4 = x3 - x2;
-    const int dy1 = y2 - y1, dy2 = y3 - y4, dy3 = y4 - y1, dy4 = y3 - y2;
-    const int max_x = std::max({std::abs(dx1), std::abs(dx2), std::abs(dy1),
-            std::abs(dy2)});
-    const int max_y = std::max({std::abs(dx3), std::abs(dx4), std::abs(dy3),
-            std::abs(dy4)});
-    for (int i {0}; i < max_x; ++i) {
-        const double x_idx1 = x1 + dx1 * double(i) / max_x;
-        const double y_idx1 = y1 + dy1 * double(i) / max_x;
-        //Point{std::round(x_idx1), std::round(y_idx1)}.draw(I, Color_name::red);
-        const double x_idx2 = x4 + dx2 * double(i) / max_x;
-        const double y_idx2 = y4 + dy2 * double(i) / max_x;
-        //Point{std::round(x_idx2), std::round(y_idx2)}.draw(I, Color_name::red);
-        const double dx_idx = x_idx2 - x_idx1;
-        const double dy_idx = y_idx2 - y_idx1;
-        for (int j {0}; j < max_y; ++j) {
-            const double x_idx = x_idx1 + dx_idx * double(j) / max_y;
-            const double y_idx = y_idx1 + dy_idx * double(j) / max_y;
-            Point{std::round(x_idx), std::round(y_idx)}.draw(I,
-                    Color_name::red);
-        }
-    }
-
-    I.write_to("scan.ppm");
+// interpolate color with floating point coordinates
+unsigned char interp_value(const unsigned char c1, const unsigned char c2,
+        const unsigned char c3, const unsigned char c4,
+        const double x, const double y) {
+    const auto x1 = int(x), x2 = x1 + 1;
+    const auto y1 = int(y), y2 = y1 + 1;
+    const auto dx1 = x - x1, dx2 = x2 - x;
+    return (y2 - y) * (dx2 * c1 + dx1 * c2) + (y - y1) * (dx2 * c4 + dx1 * c3);
 }
+
+// interpolate rgb color value
+PPM_lib::RGB_Color interp_rgb_value(const PPM_lib::RGB_Image& I,
+        const double x, const double y) {
+    const int x1 = int(x), x2 = x1 + 1;
+    const int y1 = int(y), y2 = y1 + 1;
+    const PPM_lib::RGB_Color c1 = I.color(x1, y1);
+    const PPM_lib::RGB_Color c2 = I.color(x2, y1);
+    const PPM_lib::RGB_Color c3 = I.color(x2, y2);
+    const PPM_lib::RGB_Color c4 = I.color(x1, y2);
+    const auto val1 = interp_value(c1.red(), c2.red(), c3.red(), c4.red(),
+            x, y);
+    const auto val2 = interp_value(c1.green(), c2.green(), c3.green(),
+            c4.green(), x, y);
+    const auto val3 = interp_value(c1.blue(), c2.blue(), c3.blue(), c4.blue(),
+            x, y);
+
+    return PPM_lib::RGB_Color{val1, val2, val3};
+}
+
+// fill a rectangular area with image
+void fill_rect(const PPM_lib::Rectangle& R, PPM_lib::RGB_Image& img,
+        const PPM_lib::RGB_Image& I) {
+    const int w = I.width(), h = I.height();
+    const int rw = R.width(), rh = R.height();
+    const double xq = w / double(rw);
+    const double yq = h / double(rh);
+    using namespace PPM_lib;
+    for (int i {0}; i < rw - rw / w; ++i)
+        for (int j {0}; j < rh - rh / h; ++j) {
+            PPM_lib::RGB_Color c = interp_rgb_value(I, xq * i, yq * j);
+            img.set_color(i, j, c);
+        }
+}
+
+/* --- End Interpolation --- */
+
+
 
 void apply_warp(PPM_lib::RGB_Image& I, const PPM_lib::RGB_Image& J,
         const std::vector<PPM_lib::Point> &vp1,
@@ -425,50 +402,134 @@ void apply_warp2(PPM_lib::RGB_Image& I, const PPM_lib::RGB_Image& J,
         const double dx_idx = x_idx2 - x_idx1;
         const double dy_idx = y_idx2 - y_idx1;
         for (int j {0}; j < max_y; ++j) {
-            const double x_idx = x_idx1 + dx_idx * double(i) / max_y;
+            const double x_idx = x_idx1 + dx_idx * double(j) / max_y;
             const double y_idx = y_idx1 + dy_idx * double(j) / max_y;
-            auto p = Vec3d{x_idx, y_idx, 1} * M;
+            const double a = double(i) / max_x;
+            const double b = double(j) / max_y;
+            const double x_temp = x1 + dx1 * a + dx3 * b + (x1 - x2 + x3 - x4) *
+                a * b;
+            const double y_temp = y1 + dy1 * a + dy3 * b + (y1 - y2 + y3 - y4) *
+                a * b;
+            //Vec3d p = Vec3d{x_idx, y_idx, 1} * M;
+            Vec3d p = Vec3d{x_temp, y_temp, 1} * M;
             p[0] /= p[2]; p[1] /= p[2];
             const int i1 = std::floor(p[0]), i2 = i1 + 1;
             const int j1 = std::floor(p[1]), j2 = j1 + 1;
             //const int i1 = std::floor(x_idx), i2 = i1 + 1;
             //const int j1 = std::floor(y_idx), j2 = j1 + 1;
-            if (i2 < img_w && j2 < img_h) {
-                const auto c = interp_rgb_color(J, Point{i1, j1},
-                        Point{i2, j1}, Point{i2, j2}, Point{i1, j2},
-                        p[0], p[1]);
-                Point{std::round(x_idx), std::round(y_idx)}.draw(I, c);
-                //I.set_color(std::round(x_idx), std::round(y_idx), c);
+            if (i1 >= 0 && j1 >= 0 && i2 < img_w && j2 < img_h) {
+                PPM_lib::RGB_Color c = interp_rgb_value(J, p[0], p[1]);
+                //Point{std::round(x_idx), std::round(y_idx)}.draw(I, c);
+                //I.set_color(std::round(p[0]), std::round(p[1]), c);
+                I[x_idx][y_idx] = c.color();
             }
         }
     }
 }
 
-void test_image_warp() {
+// warping loop
+void warp_loop4squares(PPM_lib::RGB_Image& I, const PPM_lib::RGB_Image& J,
+        const std::vector<PPM_lib::Point> &vp1, const int x_off = 0,
+        const int y_off = 0) {
+    const int tex_img_w = J.width(), tex_img_h = J.height();
+    const int half_w = tex_img_w >> 1, half_h = tex_img_h >> 1;
+    const int x1 = vp1[0].x(), x2 = vp1[1].x(), x3 = vp1[2].x(),
+          x4 = vp1[3].x();
+    const int y1 = vp1[0].y(), y2 = vp1[1].y(), y3 = vp1[2].y(),
+          y4 = vp1[3].y();
+    const int xa = x2 - x1, xb = x4 - x1, xab = x1 - x2 + x3 - x4;
+    const int ya = y2 - y1, yb = y4 - y1, yab = y1 - y2 + y3 - y4;
+
+    for (int i {0}; i < half_w; ++i)
+        for (int j {0}; j < half_h; ++j) {
+            const double a = double(i) / half_w;
+            const double b = double(j) / half_h;
+            const double x_out = x1 + xa * a + xb * b + xab * a * b;
+            const double y_out = y1 + ya * a + yb * b + yab * a * b;
+            if (x_out >= 0 && x_out < tex_img_w - 1 && y_out >= 0 &&
+                    y_out < tex_img_h - 1) {
+                PPM_lib::RGB_Color clr = interp_rgb_value(J, x_out, y_out);
+                I[x_off + i][y_off + j] = clr.color();
+            }
+        }
+}
+
+void warp_loop9squares(PPM_lib::RGB_Image& I, const PPM_lib::RGB_Image& J,
+        const std::vector<PPM_lib::Point> &vp1, const int x_off = 0,
+        const int y_off = 0) {
+    const int tex_img_w = J.width(), tex_img_h = J.height();
+    const int tri_w = tex_img_w / 3, tri_h = tex_img_h / 3;
+    const int x1 = vp1[0].x(), x2 = vp1[1].x(), x3 = vp1[2].x(),
+          x4 = vp1[3].x();
+    const int y1 = vp1[0].y(), y2 = vp1[1].y(), y3 = vp1[2].y(),
+          y4 = vp1[3].y();
+    const int xa = x2 - x1, xb = x4 - x1, xab = x1 - x2 + x3 - x4;
+    const int ya = y2 - y1, yb = y4 - y1, yab = y1 - y2 + y3 - y4;
+
+    for (int i {0}; i < tri_w; ++i)
+        for (int j {0}; j < tri_h; ++j) {
+            const double a = double(i) / tri_w;
+            const double b = double(j) / tri_h;
+            const double x_out = x1 + xa * a + xb * b + xab * a * b;
+            const double y_out = y1 + ya * a + yb * b + yab * a * b;
+            if (x_out >= 0 && x_out < tex_img_w - 1 && y_out >= 0 &&
+                    y_out < tex_img_h - 1) {
+                PPM_lib::RGB_Color clr = interp_rgb_value(J, x_out, y_out);
+                I[x_off + i][y_off + j] = clr.color();
+            }
+        }
+}
+
+void test_image_warp4regions() {
     using namespace PPM_lib;
     constexpr int w {1600}, h {1200};
     RGB_Image I {w, h};
 
-    RGB_Image J {"../imgs/baboon.ppm"};
+    const RGB_Image J {"../imgs/baboon.ppm"};
     const int img_w = J.width(), img_h = J.height();
-    const int hw = img_w >> 1, th = img_h / 3;
+    const int hw = img_w >> 1, th = img_h / 2;
+
+    const Point p {hw - 50, th - 50}; // "control" point
+    const std::vector<Point> vp {{0, 0}, {hw, 0}, p, {0, th}};
+    warp_loop4squares(I, J, vp);
+    warp_loop4squares(I, J, {{0, th}, p, {hw, img_h}, {0, img_h}}, 0, th);
+    warp_loop4squares(I, J, {{hw, 0}, {img_w, 0}, {img_w, th}, p}, hw, 0);
+    warp_loop4squares(I, J, {p, {img_w, th}, {img_w, img_h}, {hw, img_h}}, hw,
+            th);
+
+    I.write_to("warping.ppm");
+}
+
+void test_image_warp9regions() {
+    using namespace PPM_lib;
+    constexpr int w {1600}, h {1200};
+    RGB_Image I {w, h};
+
+    const RGB_Image J {"../imgs/baboon.ppm"};
+    const int img_w = J.width(), img_h = J.height();
+    const int w_tri = img_w / 3, h_tri = img_h / 3;
 
     //PPM_lib::Rectangle r {0, 0, size_t(img_w), size_t(img_h)};
     //fill_rect(r, I, J);
 
-    std::vector<Point> vp1 {{0, 0}, {hw, 0}, {hw, th + 50}, {0, th - 50}};
-    std::vector<Point> vp2 {{0, 0}, {hw, 0}, {hw, th}, {0, th}};
-    //const auto M = points_to_points(vp1, vp2);
-
-    apply_warp2(I, J, vp1, vp2);
-    apply_warp2(I, J, {
-            {0, th - 50}, {hw, th + 50}, {hw, 3 * th - 70}, {0, 3 * th - 30}
-            },
-            {
-            {0, th}, {hw, th}, {hw, 2 * th}, {0, 2 * th}
-            });
-
-
+    const Point p1 {w_tri - 40, h_tri - 50};
+    const Point p2 {2 * w_tri - 20, h_tri - 40};
+    const Point p3 {w_tri - 30, 2 * h_tri + 30};
+    const Point p4 {2 * w_tri + 30, 2 * h_tri - 40};
+    warp_loop9squares(I, J, {{0, 0}, {w_tri, 0}, p1, {0, h_tri}});
+    warp_loop9squares(I, J, {{w_tri, 0}, {2 * w_tri, 0}, p2, p1}, w_tri);
+    warp_loop9squares(I, J, {{2 * w_tri, 0}, {img_w, 0}, {img_w, h_tri}, p2},
+            2 * w_tri);
+    warp_loop9squares(I, J, {{0, h_tri}, p1, p3, {0, 2 * h_tri}}, 0, h_tri);
+    warp_loop9squares(I, J, {p1, p2, p4, p3}, w_tri, h_tri);
+    warp_loop9squares(I, J, {p2, {img_w, h_tri}, {img_w, 2 * h_tri}, p4},
+            2 * w_tri, h_tri);
+    warp_loop9squares(I, J, {{0, 2 * h_tri}, p3, {w_tri, img_h}, {0, img_h}},
+            0, 2 * h_tri);
+    warp_loop9squares(I, J, {p3, p4, {2 * w_tri, img_h}, {w_tri, img_h}},
+            w_tri, 2 * h_tri);
+    warp_loop9squares(I, J, {p4, {img_w, 2 * h_tri}, {img_w, img_h},
+            {2 * w_tri, img_h}}, 2 * w_tri, 2 * h_tri);
 
     I.write_to("warping.ppm");
 }
@@ -494,13 +555,64 @@ void test_points_again() {
     std::cout << dot(Vec3d{2, 2, 1}, M.col(1)) / t << '\n';
 }
 
+void test_insert_image() {
+    using namespace PPM_lib;
+    constexpr int w {1600}, h {1200};
+    RGB_Image I {w, h};
+
+    RGB_Image J {"../imgs/baboon.ppm"};
+    const auto img_w = J.width(), img_h = J.height();
+    //PPM_lib::Rectangle r {0, 0, img_w * 5 / 7, img_h * 5 / 7};
+    PPM_lib::Rectangle r {0, 0, img_w * 2, img_h * 2};
+    fill_rect(r, I, J);
+
+    I.write_to("img.ppm");
+}
+
+void test_poly_scan() {
+    using namespace PPM_lib;
+    constexpr int w {1600}, h {1200};
+    RGB_Image I {w, h};
+
+    Point p1 {10, 10}, p2 {120, 80}, p3 {150, 130}, p4 {45, 270};
+    std::vector<Point> vp1 {p1, p2, p3, p4};
+    Polygon{vp1}.draw(I);
+
+    const int x1 = vp1[0].x(), x2 = vp1[1].x(), x3 = vp1[2].x(), x4 =
+        vp1[3].x();
+    const int y1 = vp1[0].y(), y2 = vp1[1].y(), y3 = vp1[2].y(), y4 =
+        vp1[3].y();
+    const int dx1 = x2 - x1, dx2 = x3 - x4, dx3 = x4 - x1, dx4 = x3 - x2;
+    const int dy1 = y2 - y1, dy2 = y3 - y4, dy3 = y4 - y1, dy4 = y3 - y2;
+    const int max_x = std::max({std::abs(dx1), std::abs(dx2), std::abs(dy1),
+            std::abs(dy2)});
+    const int max_y = std::max({std::abs(dx3), std::abs(dx4), std::abs(dy3),
+            std::abs(dy4)});
+    const auto clr = Color_name::red;
+    for (int i {0}; i < max_x; ++i) {
+        const double x_idx1 = x1 + dx1 * double(i) / max_x;
+        const double y_idx1 = y1 + dy1 * double(i) / max_x;
+        const double x_idx2 = x4 + dx2 * double(i) / max_x;
+        const double y_idx2 = y4 + dy2 * double(i) / max_x;
+        const double dx_idx = x_idx2 - x_idx1;
+        const double dy_idx = y_idx2 - y_idx1;
+        for (int j {0}; j < max_y; ++j) {
+            const double x_idx = x_idx1 + dx_idx * double(j) / max_y;
+            const double y_idx = y_idx1 + dy_idx * double(j) / max_y;
+            Point{std::round(x_idx), std::round(y_idx)}.draw(I, clr);
+        }
+    }
+
+    I.write_to("scan.ppm");
+}
+
 int main() {
 
     //test_transform();
     //test_insert_image();
     //test_points_transform();
-    //using namespace Algebra_lib;
-    test_image_warp();
+    //test_image_warp4regions();
+    test_image_warp9regions();
     //test_poly_scan();
 
 
