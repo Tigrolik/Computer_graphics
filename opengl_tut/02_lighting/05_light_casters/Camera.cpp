@@ -23,14 +23,14 @@ Camera::Camera(const glm::vec3 pos, const glm::vec3 up,
 // get lookat matrix
 glm::mat4 Camera::view_matrix() const {
     // using own version of lookat matrix impementation
-    return glm::transpose(glm::mat4 {glm::vec4{cam_right_, 0},
-            glm::vec4{glm::cross(-cam_front_, cam_right_), 0},
-            glm::vec4{-cam_front_, 0}, glm::vec4{0, 0, 0, 1} }) *
-        glm::mat4 {glm::vec4{1, 0, 0, 0}, glm::vec4{0, 1, 0, 0},
-            glm::vec4{0, 0, 1, 0}, glm::vec4{-cam_pos_, 1} };
+    //return glm::transpose(glm::mat4 {glm::vec4{cam_right_, 0},
+    //        glm::vec4{glm::cross(-cam_front_, cam_right_), 0},
+    //        glm::vec4{-cam_front_, 0}, glm::vec4{0, 0, 0, 1} }) *
+    //    glm::mat4 {glm::vec4{1, 0, 0, 0}, glm::vec4{0, 1, 0, 0},
+    //        glm::vec4{0, 0, 1, 0}, glm::vec4{-cam_pos_, 1} };
 
     // using glm lookat matrix function
-    //return glm::lookAt(cam_pos_, cam_pos_ + cam_front_, cam_up_);
+    return glm::lookAt(cam_pos_, cam_pos_ + cam_front_, cam_up_);
 }
 
 // process input from keyboard
@@ -62,8 +62,8 @@ void Camera::process_keyboard(const Camera::Movement dir,const GLfloat dt) {
 void Camera::process_mouse_move(const GLfloat x_offset, const GLfloat y_offset,
             const GLboolean cut_pitch) {
     // update Euler angles
-    yaw_ang_   += x_offset * mouse_sensitivity_;
-    pitch_ang_ += y_offset * mouse_sensitivity_;
+    yaw_ang_   += (x_offset * mouse_sensitivity_);
+    pitch_ang_ += (y_offset * mouse_sensitivity_);
     // avoid flipping over
     if (cut_pitch) {
         if (pitch_ang_ > 89)
@@ -88,7 +88,8 @@ void Camera::process_scroll(const GLfloat y_offset) {
 void Camera::update_camera_vectors() {
     const GLfloat p_cos = cos(glm::radians(pitch_ang_));
     cam_front_ = glm::normalize(glm::vec3{cos(glm::radians(yaw_ang_)) * p_cos,
-            sin(glm::radians(pitch_ang_)), sin(glm::radians(yaw_ang_))*p_cos});
+            sin(glm::radians(pitch_ang_)), sin(glm::radians(yaw_ang_)) *
+            p_cos});
     cam_right_ = glm::normalize(glm::cross(cam_front_, world_up_));
     cam_up_ = glm::normalize(glm::cross(cam_right_, cam_front_));
 }

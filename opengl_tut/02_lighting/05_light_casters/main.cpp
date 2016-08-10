@@ -2,7 +2,7 @@
  * Following tutorial on OpenGL (materials):
  * http://learnopengl.com/#!Lighting/Light-casters
  *
- * Practicing with diffuse, specular and emission lighting applied to a texture
+ * Practicing with direct, point and spot lights
  *
  */
 
@@ -64,7 +64,7 @@ void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
         const bool, const int);
 
 // drawing colored object and "lamp" box with various lighting
-void diffuse_light_cube(GLFWwindow*, const int = 0);
+void illuminate_cubes(GLFWwindow*, const int = 0);
 void draw_objects(GLFWwindow*, const std::vector<GLfloat>&, const Shader&,
         const int = 0, const bool = false);
 void light_obj_loop(GLFWwindow*, const std::vector<GLuint>&,
@@ -96,9 +96,9 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates how material properties can be simulated" <<
-        " with colors. The scene contains two objects:\n" <<
-        "lamp (white cube) and illuminated object (colored cube)\n" <<
+        "This program demonstrates how various lighting conditions can be " <<
+        "simulated: direct lighting, point lighting (with a lamp object) " <<
+        "and spot lighting:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "keys W/S - up and down, arrows up/down - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
@@ -127,33 +127,27 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'6'};
+    static constexpr char num_options {'4'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
-            case 5:
-                diffuse_light_cube(win, 5);
-                break;
-            case 4:
-                diffuse_light_cube(win, 4);
-                break;
             case 3:
-                diffuse_light_cube(win, 3);
+                illuminate_cubes(win, 3);
                 break;
             case 2:
-                diffuse_light_cube(win, 2);
+                illuminate_cubes(win, 2);
                 break;
             case 1:
-                diffuse_light_cube(win, 1);
+                illuminate_cubes(win, 1);
                 break;
             case 0:
             default:
-                diffuse_light_cube(win, 0);
+                illuminate_cubes(win, 0);
         }
     } else {
-        std::cerr << "Wrong input: drawing default cube\n";
-        diffuse_light_cube(win, 0);
+        std::cerr << "Wrong input: drawing default cubes\n";
+        illuminate_cubes(win, 0);
     }
 }
 
@@ -163,12 +157,11 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\twooden box without \"wood\" reflection (default)\n" <<
-        "1:\twooden box with reflection on metal brim\n" <<
-        "2:\twooden box with lamp emitting blueish color\n" <<
-        "3:\tbox with inverted reflection (\"metal\" box & \"wood\" brim)\n" <<
-        "4:\twooden box with red-greenish color\n";
-    diffuse_light_cube(win, 0);
+        "0:    wooden boxes and direct lighting (\"sun\" light, default)\n" <<
+        "1:    wooden boxes and point lighting with rotating lamp\n" <<
+        "2:    wooden boxes and spot lighting\n" <<
+        "3:    wooden boxes and spot lighting (soft edges)\n";
+    illuminate_cubes(win, 0);
 }
 
 /*
@@ -239,12 +232,10 @@ void mouse_callback(GLFWwindow*, const double xpos, const double ypos) {
         first_mouse_move = false;
     }
 
-    const GLfloat xoffset = xpos - last_x, yoffset = last_y - ypos;
+    main_cam.process_mouse_move(xpos - last_x, last_y - ypos);
 
     last_x = xpos;
     last_y = ypos;
-
-    main_cam.process_mouse_move(xoffset, yoffset);
 }
 
 /*
@@ -354,7 +345,7 @@ void make_textures(const GLuint tex, const std::string& img_fn,
 
 
 // draw a box enlighted by a diffused light
-void diffuse_light_cube(GLFWwindow *win, const int option) {
+void illuminate_cubes(GLFWwindow *win, const int option) {
     static const std::vector<GLfloat> vertices {
         // pos            normals    tex coords
         -0.5, -0.5, -0.5,  0,  0, -1,  0, 0,
@@ -400,22 +391,16 @@ void diffuse_light_cube(GLFWwindow *win, const int option) {
         -0.5,  0.5, -0.5,  0,  1,  0,  0, 1
     };
     switch (option) {
-        case 5:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_diffuse_02.vs",
-                    shad_path + "light_shader_mater_05.frag"}, option);
-            break;
-        case 4:
-            draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_diffuse_02.vs",
-                    shad_path + "light_shader_mater_03.frag"}, option);
-            break;
         case 3:
             draw_objects(win, vertices,
                     Shader {shad_path + "light_shader_diffuse_02.vs",
-                    shad_path + "light_shader_mater_04.frag"}, option);
+                    shad_path + "light_shader_flashlight_02.frag"}, option);
             break;
         case 2:
+            draw_objects(win, vertices,
+                    Shader {shad_path + "light_shader_diffuse_02.vs",
+                    shad_path + "light_shader_flashlight_01.frag"}, option);
+            break;
         case 1:
             draw_objects(win, vertices,
                     Shader {shad_path + "light_shader_direct_01.vs",
@@ -438,10 +423,6 @@ void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &vertices,
         shad_path + "lamp_shader_01.frag"};
     std::vector<std::string> tex_imgs {{tex_path + "container2.png"},
         {tex_path + "container2_specular.png"}};
-    if (option == 4)
-        tex_imgs[1] = {tex_path + "lighting_maps_specular_color.png"};
-    if (option == 5)
-        tex_imgs.push_back({tex_path + "matrix.jpg"});
 
     GLuint VAO_obj {}, VAO_lamp {}, VBO {};
 
@@ -453,12 +434,8 @@ void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &vertices,
     make_objects(VAO_vec[0], VBO_vec[0], vertices, true, 2);
     make_objects(VAO_vec[1], VBO_vec[0], vertices, false, 0);
 
-    // texture(s)
-    int num_tex {1};
-    if (option >= 0) // add specular map
-        ++num_tex;
-    if (option == 5) // add emission map
-        ++num_tex;
+    // texture
+    int num_tex {2};
     std::vector<GLuint> textures(num_tex);
     gen_textures(textures);
     for (int i {0}; i < num_tex; ++i)
@@ -476,7 +453,7 @@ void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &vertices,
 // main loop for drawing light objects
 void light_obj_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
         const std::vector<GLuint> &tex_maps, const std::vector<Shader> &shad,
-        const bool rot_lamp, const int opt) {
+        const bool rot_lamp, const int option) {
     int win_w, win_h;
     glfwGetFramebufferSize(win, &win_w, &win_h);
     const auto win_asp = float(win_w) / win_h;
@@ -502,8 +479,8 @@ void light_obj_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
         const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
                 100.0f);
 
-        draw_light_obj(shad[0], VAO[0], tex_maps, view, proj, lamp_pos, opt);
-        if (opt > 0)
+        draw_light_obj(shad[0], VAO[0], tex_maps, view, proj, lamp_pos, option);
+        if (option == 1)
             draw_lamp(shad[1], VAO[1], view, proj, lamp_pos);
 
         glfwSwapBuffers(win);
@@ -524,18 +501,31 @@ void draw_light_obj(const Shader &shad, const GLuint VAO,
     if (option == 1)
         glUniform3f(glGetUniformLocation(idx, "light.pos"),
                 lamp_pos.x, lamp_pos.y, lamp_pos.z);
+    if (option >= 2) {
+        glUniform3f(glGetUniformLocation(idx, "light.pos"),
+                main_cam.pos().x, main_cam.pos().y, main_cam.pos().z);
+        glUniform3f(glGetUniformLocation(idx, "light.direction"),
+                main_cam.front().x, main_cam.front().y, main_cam.front().z);
+        glUniform1f(glGetUniformLocation(idx, "light.cutoff"),
+                glm::cos(glm::radians(12.5)));
+        if (option == 3)
+            glUniform1f(glGetUniformLocation(idx, "light.outer_cutoff"),
+                    glm::cos(glm::radians(17.5)));
+    }
     glUniform3f(glGetUniformLocation(idx, "view_pos"),
             main_cam.pos().x, main_cam.pos().y, main_cam.pos().z);
 
     // colors and materials
-    glUniform3f(glGetUniformLocation(idx, "light.ambient"), 0.2, 0.2, 0.2);
-    glUniform3f(glGetUniformLocation(idx, "light.diffuse"), 0.5, 0.5, 0.5);
-    if (option == 2)
-        glUniform3f(glGetUniformLocation(idx, "light.specular"), 0, 0, 1);
-    else
-        glUniform3f(glGetUniformLocation(idx, "light.specular"), 1, 1, 1);
+    if (option >= 2) { // tweaking...
+        glUniform3f(glGetUniformLocation(idx, "light.ambient"), 0.1, 0.1, 0.1);
+        glUniform3f(glGetUniformLocation(idx, "light.diffuse"), 0.8, 0.8, 0.8);
+    } else {
+        glUniform3f(glGetUniformLocation(idx, "light.ambient"), 0.2, 0.2, 0.2);
+        glUniform3f(glGetUniformLocation(idx, "light.diffuse"), 0.5, 0.5, 0.5);
+    }
+    glUniform3f(glGetUniformLocation(idx, "light.specular"), 1, 1, 1);
 
-    if (option == 1) {
+    if (option >= 1) {
         glUniform1f(glGetUniformLocation(idx, "light.constant_term"), 1);
         glUniform1f(glGetUniformLocation(idx, "light.linear_term"), 0.09);
         glUniform1f(glGetUniformLocation(idx, "light.quadratic_term"), 0.032);
