@@ -393,12 +393,12 @@ void illuminate_cubes(GLFWwindow *win, const int option) {
     switch (option) {
         case 3:
             draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_diffuse_02.vs",
+                    Shader {shad_path + "light_shader_direct_01.vs",
                     shad_path + "light_shader_flashlight_02.frag"}, option);
             break;
         case 2:
             draw_objects(win, vertices,
-                    Shader {shad_path + "light_shader_diffuse_02.vs",
+                    Shader {shad_path + "light_shader_direct_01.vs",
                     shad_path + "light_shader_flashlight_01.frag"}, option);
             break;
         case 1:
