@@ -15,9 +15,7 @@ uniform mat4 proj;
 void main()
 {
     gl_Position = proj * view * model * vec4(position, 1);
-    // fragment's pos in world coordinates
     frag_pos = vec3(model * vec4(position, 1));
     normal_vec = mat3(transpose(inverse(model))) * normal;
-    //vert_tex = vec2(tex_coord.x, 1 - tex_coord.y);
     vert_tex = tex_coord;
 }
