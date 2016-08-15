@@ -1,9 +1,9 @@
 /*
  * Following tutorial on OpenGL (materials):
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Depth-testing
+ * http://learnopengl.com/#!Advanced-OpenGL/Stencil-testing
  *
- * Depth options demonstration
+ * Stencil options demonstration
  *
  */
 
@@ -70,7 +70,7 @@ void make_textures(const GLuint, const std::string&,
         const GLenum, const GLenum);
 
 // drawing colored object and "lamp" box with various lighting
-void depth_test(GLFWwindow*, const int = 0);
+void stencil_test(GLFWwindow*, const int = 0);
 void draw_objects(GLFWwindow*, const std::vector<GLfloat>&,
         const std::vector<GLfloat>&, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
@@ -129,30 +129,24 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'5'};
+    static constexpr char num_options {'3'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
-            case 4:
-                depth_test(win, 4);
-                break;
-            case 3:
-                depth_test(win, 3);
-                break;
             case 2:
-                depth_test(win, 2);
+                stencil_test(win, 2);
                 break;
             case 1:
-                depth_test(win, 1);
+                stencil_test(win, 1);
                 break;
             case 0:
             default:
-                depth_test(win, 0);
+                stencil_test(win, 0);
         }
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        depth_test(win, 0);
+        stencil_test(win, 0);
     }
 }
 
@@ -162,12 +156,10 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tcube on a floor with depth: GL_LESS (default)\n" <<
-        "1:\tcube on a floor with depth: GL_ALWAYS\n" <<
-        "2:\tcube on a floor with depth: GL_NOTEQUAL\n" <<
-        "3:\tdepth buffer (white)\n" <<
-        "4:\tdepth buffer (dark)\n";
-    depth_test(win, 0);
+        "0:\toutlined cubes: GL_REPLACE (default)\n" <<
+        "1:\toutlined cubes: GL_INVERT\n" <<
+        "2:\toutlined cubes: GL_INCR_WRAP\n";
+    stencil_test(win, 0);
 }
 
 /*
@@ -185,7 +177,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Depth testing", nullptr,
+    GLFWwindow *win = glfwCreateWindow(w, h, "Stencil testing", nullptr,
             nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
@@ -208,8 +200,9 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
 
-    // enable depth testing for nice 3D output
+    // enable depth and stencil testing for nice 3D output
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
 
     return win;
 }
@@ -341,7 +334,7 @@ void make_textures(const GLuint tex, const std::string& img_fn,
 
 
 // draw a box on a floor
-void depth_test(GLFWwindow *win, const int option) {
+void stencil_test(GLFWwindow *win, const int option) {
     static const std::vector<GLfloat> cube_verts {
         // pos          tex coords
         -0.5, -0.5, -0.5,  0, 0,
@@ -399,20 +392,8 @@ void depth_test(GLFWwindow *win, const int option) {
 void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &cube_verts,
         const std::vector<GLfloat> &floor_verts, const int option) {
 
-    Shader obj_shader;
-    switch (option) {
-        case 4:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_03.frag"};
-            break;
-        case 3:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_02.frag"};
-            break;
-        default:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_01.frag"};
-    }
+    const Shader obj_shader = Shader {shad_path + "depth_test_01.vs",
+        shad_path + "depth_test_01.frag"};
 
     std::vector<std::string> tex_imgs {{tex_path + "pattern4diffuseblack.jpg"},
         {tex_path + "metal.png"}};
@@ -450,37 +431,56 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
     int win_w, win_h;
     glfwGetFramebufferSize(win, &win_w, &win_h);
     const auto win_asp = float(win_w) / win_h;
-
-    glDepthMask(GL_TRUE);
+    // shader for outlining the cubes
+    const Shader color_shader {shad_path + "depth_test_01.vs",
+        shad_path + "stencil_test_01.frag"};
     switch (option) {
         case 2:
-            glDepthFunc(GL_NOTEQUAL);
+            glStencilOp(GL_KEEP, GL_KEEP, GL_INCR_WRAP);
             break;
         case 1:
-            glDepthFunc(GL_ALWAYS);
+            glStencilOp(GL_KEEP, GL_KEEP, GL_INVERT);
             break;
-        case 0:
         default:
-            glDepthFunc(GL_LESS);
+            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     }
-
+    // disable writing to the stencil buffer
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;
         last_frame_time  = curr_time;
         glfwPollEvents();
         do_movement();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                GL_STENCIL_BUFFER_BIT);
         const auto view = main_cam.view_matrix();
         const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
                 100.0f);
+        // drawing floor
+        glStencilMask(0x00);
+        draw_object(shad, VAO[1], tex_maps[1], view, proj, glm::mat4{},
+                num_verts[1]);
+        // drawing cubes: 1st pass
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0xFF);
         draw_object(shad, VAO[0], tex_maps[0], view, proj,
                 glm::translate(glm::mat4{}, glm::vec3{-1, 0, -1}),
                 num_verts[0]);
-        draw_object(shad, VAO[1], tex_maps[1], view, proj,
-                glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}),
-                num_verts[1]);
-
+        draw_object(shad, VAO[0], tex_maps[0], view, proj,
+                glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}), num_verts[0]);
+        // drawing cubes: 2nd pass
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glDisable(GL_DEPTH_TEST);
+        draw_object(color_shader, VAO[0], tex_maps[0], view, proj,
+                glm::scale(glm::translate(glm::mat4{}, glm::vec3{-1, 0, -1}),
+                    glm::vec3{1.1}), num_verts[0]);
+        draw_object(color_shader, VAO[0], tex_maps[0], view, proj,
+                glm::scale(glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}),
+                    glm::vec3{1.1}), num_verts[0]);
+        glStencilMask(0xFF);
+        glEnable(GL_DEPTH_TEST);
         glfwSwapBuffers(win);
     }
 }
@@ -492,6 +492,9 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
     shad.use();
     const auto idx = shad.id();
 
+    glBindVertexArray(VAO);
+    glBindTexture(GL_TEXTURE_2D, tex_map);
+
     glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
             glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
@@ -499,8 +502,6 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
     glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
             glm::value_ptr(mod));
 
-    glBindVertexArray(VAO);
-    glBindTexture(GL_TEXTURE_2D, tex_map);
 
     glDrawArrays(GL_TRIANGLES, 0, num_verts);
 
