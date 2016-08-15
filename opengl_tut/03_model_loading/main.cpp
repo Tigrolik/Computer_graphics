@@ -248,13 +248,12 @@ void draw_model(GLFWwindow *win, Model& m, const int option) {
     }
 }
 
-// main loop for drawing light objects
+// main loop for drawing objects
 void game_loop(GLFWwindow *win, Model& model, const Shader& shad,
         const int option) {
     int win_w, win_h;
     glfwGetFramebufferSize(win, &win_w, &win_h);
     const auto win_asp = float(win_w) / win_h;
-
 
     static const std::vector<glm::vec3> lamps_pos = {
         glm::vec3{2.7, 2.2, 2}, glm::vec3{2.3, 3.3, 4},
