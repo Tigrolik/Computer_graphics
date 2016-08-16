@@ -339,7 +339,6 @@ void make_textures(const GLuint tex, const std::string& img_fn,
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-
 // draw a box on a floor
 void depth_test(GLFWwindow *win, const int option) {
     static const std::vector<GLfloat> cube_verts {
@@ -436,6 +435,9 @@ void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &cube_verts,
         make_textures(textures[i], tex_imgs[i], {GL_REPEAT, GL_REPEAT},
                 {GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR});
 
+    //for (std::size_t i {0}; i < num_tex; ++i)
+    //    textures[i] = load_texture(tex_imgs[i], false);
+
     const std::vector<size_t> num_verts {cube_verts.size() / stride,
         floor_verts.size() / stride};
 
@@ -464,6 +466,7 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
             glDepthFunc(GL_LESS);
     }
 
+    glClearColor(0.15, 0.15, 0.15, 1);
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;

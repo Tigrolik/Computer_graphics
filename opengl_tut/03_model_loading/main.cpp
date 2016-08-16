@@ -65,6 +65,8 @@ void show_menu(GLFWwindow*, Model&, const std::string&);
 void set_dir_light(const GLuint, const int);
 void set_point_lights(const GLuint, const std::vector<glm::vec3>&, const int);
 void set_spot_light(const GLuint, const int);
+void draw_lamp(const Shader&, const GLuint, const glm::mat4&,
+        const glm::mat4&, const glm::vec3&, const glm::vec3& = {1, 1, 1});
 
 // here goes the main()
 int main(int argc, char *argv[]) try {
@@ -213,13 +215,13 @@ void scroll_callback(GLFWwindow*, const double, const double yoffset) {
  */
 void do_movement() {
     if (keys[GLFW_KEY_UP])
-        main_cam.process_keyboard(Camera::forward_dir, delta_frame_time);
-    else if (keys[GLFW_KEY_DOWN])
-        main_cam.process_keyboard(Camera::backward_dir, delta_frame_time);
-    else if (keys[GLFW_KEY_S])
-        main_cam.process_keyboard(Camera::down_dir, delta_frame_time);
-    else if (keys[GLFW_KEY_W])
         main_cam.process_keyboard(Camera::up_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_DOWN])
+        main_cam.process_keyboard(Camera::down_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_S])
+        main_cam.process_keyboard(Camera::backward_dir, delta_frame_time);
+    else if (keys[GLFW_KEY_W])
+        main_cam.process_keyboard(Camera::forward_dir, delta_frame_time);
     else if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT])
         main_cam.process_keyboard(Camera::left_dir, delta_frame_time);
     else if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT])
@@ -256,11 +258,12 @@ void game_loop(GLFWwindow *win, Model& model, const Shader& shad,
     const auto win_asp = float(win_w) / win_h;
 
     static const std::vector<glm::vec3> lamps_pos = {
-        glm::vec3{2.7, 2.2, 2}, glm::vec3{2.3, 3.3, 4},
-        glm::vec3{4, 2, 12}, glm::vec3{0, 0, 1}
+        //glm::vec3{0, 0, -4}, glm::vec3{0, 0, -4},
+        //glm::vec3{0, 0, -4}, glm::vec3{0, 0, -4},
+        glm::vec3{-4, 0, -4}, glm::vec3{-4, 0, -4},
+        glm::vec3{-4, 0, -4}, glm::vec3{-4, 0, -4}
     };
 
-    const glm::vec3 lamp_pos {1, 0, -1.5};
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(win)) {
 
@@ -281,7 +284,7 @@ void game_loop(GLFWwindow *win, Model& model, const Shader& shad,
         if (option > 0) {
             set_dir_light(idx, option);
             set_point_lights(idx, lamps_pos, option);
-            set_spot_light(idx, option);
+            //set_spot_light(idx, option);
         }
 
         // matrices
@@ -313,11 +316,11 @@ void set_dir_light(const GLuint idx, const int option) {
     switch (option) {
         case 1:
             glUniform3f(glGetUniformLocation(idx, "dir_light.ambient"),
-                    0.5, 0.5, 0.5);
+                    0.1, 0.1, 0.1);
             glUniform3f(glGetUniformLocation(idx, "dir_light.diffuse"),
-                    1, 1, 1);
+                    0.1, 0.1, 0.1);
             glUniform3f(glGetUniformLocation(idx, "dir_light.specular"),
-                    1, 1, 1);
+                    0.1, 0.1, 0.1);
             break;
         default:
             glUniform3f(glGetUniformLocation(idx, "dir_light.ambient"),
@@ -337,9 +340,9 @@ void set_point_lights(const GLuint idx,
         glUniform3f(glGetUniformLocation(idx, (ins + ".pos").c_str()),
                 lamps_pos[i].x, lamps_pos[i].y, lamps_pos[i].z);
         glUniform3f(glGetUniformLocation(idx, (ins + ".ambient").c_str()),
-                0.5, 0.5, 0.5);
+                0.1, 0.1, 0.1);
         glUniform3f(glGetUniformLocation(idx, (ins + ".diffuse").c_str()),
-                0.8, 0.8, 0.8);
+                0.2, 0.2, 0.2);
         glUniform3f(glGetUniformLocation(idx, (ins + ".specular").c_str()),
                 1, 1, 1);
         glUniform1f(glGetUniformLocation(idx, (ins + ".constant_term").c_str()),
@@ -381,3 +384,29 @@ void set_spot_light(const GLuint idx, const int option) {
     glUniform1f(glGetUniformLocation(idx, "spot_light.outer_cutoff"),
             glm::cos(glm::radians(15.5)));
 }
+
+// helper function for drawing "lamp" object
+void draw_lamp(const Shader &shad, const GLuint VAO, const glm::mat4 &view,
+        const glm::mat4 &proj, const glm::vec3 &lamp_pos,
+        const glm::vec3 &lamp_color) {
+    shad.use();
+    const auto idx = shad.id();
+
+    glUniform3f(glGetUniformLocation(idx, "lamp_color"),
+            lamp_color.x, lamp_color.y, lamp_color.z);
+
+    const glm::mat4 model = glm::scale(glm::translate(glm::mat4{}, lamp_pos),
+            glm::vec3{0.2});
+
+    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
+            glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
+            glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
+            glm::value_ptr(model));
+
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+}
+

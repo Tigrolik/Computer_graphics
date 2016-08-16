@@ -1,14 +1,15 @@
 /*
  * Following tutorial on OpenGL (materials):
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Stencil-testing
+ * http://learnopengl.com/#!Advanced-OpenGL/Blending*
  *
- * Stencil options demonstration
+ * Blending options demonstration
  *
  */
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include <functional>
 #include <stdexcept>
 #include <cassert>
@@ -64,24 +65,22 @@ void gen_objects(std::vector<GLuint>*, std::vector<GLuint>*);
 void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
         const bool, const int, const GLuint);
 
-// init textures
-void gen_textures(std::vector<GLuint>&);
-void make_textures(const GLuint, const std::string&,
-        const GLenum, const GLenum);
+// loading textures
+GLuint load_texture(const std::string&, const GLboolean = false);
 
 // drawing colored object and "lamp" box with various lighting
-void stencil_test(GLFWwindow*, const int = 0);
-void draw_objects(GLFWwindow*, const std::vector<GLfloat>&,
-        const std::vector<GLfloat>&, const int = 0);
+void blend_test(GLFWwindow*, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
         const glm::mat4&, const glm::mat4&, const GLuint);
 void game_loop(GLFWwindow*, const std::vector<GLuint>&,
         const std::vector<GLuint>&, const std::vector<size_t>&,
         const Shader&, const int);
 
+// function to compute aspect ratio of screen's width and height
+float window_aspect_ratio(GLFWwindow*);
 // function to compute sizeof elements lying in the vector container
 template <class T>
-constexpr size_t size_of_elements(const std::vector<T> &v) {
+constexpr size_t size_in_bytes(const std::vector<T> &v) {
     return v.size() * sizeof(T);
 }
 
@@ -100,7 +99,7 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates various stencil options:\n" <<
+        "This program demonstrates various blending options:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "up/down arrow keys - up and down, W/S - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
@@ -129,24 +128,27 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'3'};
+    static constexpr char num_options {'4'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
+            case 3:
+                blend_test(win, 3);
+                break;
             case 2:
-                stencil_test(win, 2);
+                blend_test(win, 2);
                 break;
             case 1:
-                stencil_test(win, 1);
+                blend_test(win, 1);
                 break;
             case 0:
             default:
-                stencil_test(win, 0);
+                blend_test(win, 0);
         }
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        stencil_test(win, 0);
+        blend_test(win, 0);
     }
 }
 
@@ -156,10 +158,11 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\toutlined cubes: GL_REPLACE (default)\n" <<
-        "1:\toutlined cubes: GL_INVERT\n" <<
-        "2:\toutlined cubes: GL_INCR_WRAP\n";
-    stencil_test(win, 0);
+        "0:\tcubes with grass without alpha blending (default)\n" <<
+        "1:\tcubes and grass (alpha blending on)\n" <<
+        "2:\tcubes and windows (not ordered, occlusions appear)\n" <<
+        "3:\tcubes and windows (ordered)\n";
+    blend_test(win, 0);
 }
 
 /*
@@ -177,8 +180,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Stencil testing", nullptr,
-            nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Blending", nullptr, nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
@@ -200,11 +202,18 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
 
-    // enable depth and stencil testing for nice 3D output
+    // enable depth and blend testing
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_STENCIL_TEST);
+    glEnable(GL_BLEND);
 
     return win;
+}
+
+// function to calculate aspect ratio of screen's width and height
+float window_aspect_ratio(GLFWwindow *win) {
+    int win_w, win_h;
+    glfwGetFramebufferSize(win, &win_w, &win_h);
+    return float(win_w) / win_h;
 }
 
 /*
@@ -291,51 +300,57 @@ void make_objects(const GLuint VAO, const GLuint VBO,
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, size_of_elements(vertices), vertices.data(),
+    glBufferData(GL_ARRAY_BUFFER, size_in_bytes(vertices), vertices.data(),
             GL_STATIC_DRAW);
 
+    glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
             (GLvoid*)0);
-    glEnableVertexAttribArray(0);
 
+    glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
             (GLvoid*)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-    glBindVertexArray(0);
-}
 
-// exploiting std::vector to initialize several textures
-void gen_textures(std::vector<GLuint> &tex) {
-    for (auto &x: tex)
-        glGenTextures(1, &x);
+    glBindVertexArray(0);
 }
 
 /*
  * Binding textures with the image data
+ * If image uses the alpha value then GL_RGBA parameter is used instead of
+ * GL_RGB, as well as the wrap parameter is changed to GL_CLAMP_TO_EDGE
  */
-void make_textures(const GLuint tex, const std::string& img_fn,
-        const std::vector<GLenum> &wrap, const std::vector<GLenum> &filter) {
+GLuint load_texture(const std::string& img_fn, const GLboolean alpha) {
+    GLuint tex_id;
+    glGenTextures(1, &tex_id);
+
+    //const auto load_type = alpha ? SOIL_LOAD_RGBA : SOIL_LOAD_RGB;
+    const auto img_type = alpha ? GL_RGBA : GL_RGB;
+    const auto wrap_type = alpha ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+
     int img_w, img_h;
     unsigned char *img = SOIL_load_image(img_fn.c_str(), &img_w, &img_h, 0,
-            SOIL_LOAD_RGB);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_w, img_h, 0, GL_RGB,
+            alpha ? SOIL_LOAD_RGBA : SOIL_LOAD_RGB);
+
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, img_type, img_w, img_h, 0, img_type,
             GL_UNSIGNED_BYTE, img);
     glGenerateMipmap(GL_TEXTURE_2D);
     SOIL_free_image_data(img);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap[0]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap[1]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter[0]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter[1]);
-
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_type);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_type);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+            GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    return tex_id;
 }
 
 
-// draw boxes with outline on a floor
-void stencil_test(GLFWwindow *win, const int option) {
-    static const std::vector<GLfloat> cube_verts {
+// get cube object vertices
+std::vector<GLfloat> cube_vertices() {
+    return std::vector<GLfloat> {
         // pos          tex coords
         -0.5, -0.5, -0.5,  0, 0,
          0.5, -0.5, -0.5,  1, 0,
@@ -343,30 +358,35 @@ void stencil_test(GLFWwindow *win, const int option) {
          0.5,  0.5, -0.5,  1, 1,
         -0.5,  0.5, -0.5,  0, 1,
         -0.5, -0.5, -0.5,  0, 0,
+
         -0.5, -0.5,  0.5,  0, 0,
          0.5, -0.5,  0.5,  1, 0,
          0.5,  0.5,  0.5,  1, 1,
          0.5,  0.5,  0.5,  1, 1,
         -0.5,  0.5,  0.5,  0, 1,
         -0.5, -0.5,  0.5,  0, 0,
+
         -0.5,  0.5,  0.5,  1, 0,
         -0.5,  0.5, -0.5,  1, 1,
         -0.5, -0.5, -0.5,  0, 1,
         -0.5, -0.5, -0.5,  0, 1,
         -0.5, -0.5,  0.5,  0, 0,
         -0.5,  0.5,  0.5,  1, 0,
+
          0.5,  0.5,  0.5,  1, 0,
          0.5,  0.5, -0.5,  1, 1,
          0.5, -0.5, -0.5,  0, 1,
          0.5, -0.5, -0.5,  0, 1,
          0.5, -0.5,  0.5,  0, 0,
          0.5,  0.5,  0.5,  1, 0,
+
         -0.5, -0.5, -0.5,  0, 1,
          0.5, -0.5, -0.5,  1, 1,
          0.5, -0.5,  0.5,  1, 0,
          0.5, -0.5,  0.5,  1, 0,
         -0.5, -0.5,  0.5,  0, 0,
         -0.5, -0.5, -0.5,  0, 1,
+
         -0.5,  0.5, -0.5,  0, 1,
          0.5,  0.5, -0.5,  1, 1,
          0.5,  0.5,  0.5,  1, 0,
@@ -374,53 +394,101 @@ void stencil_test(GLFWwindow *win, const int option) {
         -0.5,  0.5,  0.5,  0, 0,
         -0.5,  0.5, -0.5,  0, 1
     };
-
-    static const std::vector<GLfloat> floor_verts {
-         // pos        tex coords
-         5,  -0.5,  5,  2, 0,
-        -5,  -0.5,  5,  0, 0,
-        -5,  -0.5, -5,  0, 2,
-         5,  -0.5,  5,  2, 0,
-        -5,  -0.5, -5,  0, 2,
-         5,  -0.5, -5,  2, 2
-    };
-
-    draw_objects(win, cube_verts, floor_verts, option);
 }
 
-// helper function to draw lighting objects
-void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &cube_verts,
-        const std::vector<GLfloat> &floor_verts, const int option) {
+// get floor object vertices
+std::vector<GLfloat> floor_vertices() {
+    return std::vector<GLfloat> {
+        // pos        tex coords
+         5, -0.5,  5,  2, 0,
+        -5, -0.5,  5,  0, 0,
+        -5, -0.5, -5,  0, 2,
 
-    const Shader obj_shader = Shader {shad_path + "depth_test_01.vs",
-        shad_path + "depth_test_01.frag"};
+         5, -0.5,  5,  2, 0,
+        -5, -0.5, -5,  0, 2,
+         5, -0.5, -5,  2, 2
+    };
+}
 
-    std::vector<std::string> tex_imgs {{tex_path + "pattern4diffuseblack.jpg"},
-        {tex_path + "metal.png"}};
+// get grass object vertices
+std::vector<GLfloat> blend_vertices() {
+    return std::vector<GLfloat> {
+        // pos      tex coords
+        0,  0.5, 0,  0, 0,
+        0, -0.5, 0,  0, 1,
+        1, -0.5, 0,  1, 1,
 
-    GLuint VAO_cube {}, VAO_floor {}, VBO_cube {}, VBO_floor {};
+        0,  0.5, 0,  0, 0,
+        1, -0.5, 0,  1, 1,
+        1,  0.5, 0,  1, 0
+    };
+}
 
-    // VAOs and VBOs
-    std::vector<GLuint> VAO_vec {VAO_cube, VAO_floor};
-    std::vector<GLuint> VBO_vec {VBO_cube, VBO_floor};
+// get coordinates of cubes objects
+std::vector<glm::vec3> cubes_positions() {
+    return {
+        glm::vec3{-1, 0, -1},
+        glm::vec3{ 2, 0,  0}
+    };
+}
 
-    const GLuint stride = 5;
+// get coordinates of grass objects
+std::vector<glm::vec3> blend_positions() {
+    return {
+        glm::vec3{-1.5, 0, -0.48},
+        glm::vec3{ 1.5, 0,  0.51},
+        glm::vec3{   0, 0,   0.7},
+        glm::vec3{-0.3, 0,  -2.3},
+        glm::vec3{ 0.5, 0,  -0.6}
+    };
+}
+
+// draw boxes on a floor
+void blend_test(GLFWwindow *win, const int option) {
+    static const std::vector<std::vector<GLfloat>> verts {
+        cube_vertices(), floor_vertices(), blend_vertices()};
+
+    // keep VAOs and VBOs for our objects in vectors
+    static const auto num_obj = verts.size();
+    std::vector<GLuint> VAO_vec (num_obj);
+    std::vector<GLuint> VBO_vec (num_obj);
+
+    const GLuint stride {5};
     gen_objects(&VAO_vec, &VBO_vec);
-    make_objects(VAO_vec[0], VBO_vec[0], cube_verts, stride);
-    make_objects(VAO_vec[1], VBO_vec[1], floor_verts, stride);
+    for (std::size_t i {0}; i < num_obj; ++i)
+        make_objects(VAO_vec[i], VBO_vec[i], verts[i], stride);
 
-    // texture
+    // loading and mapping textures
+    static std::vector<std::string> tex_imgs {tex_path +
+        "pattern4diffuseblack.jpg", tex_path + "metal.png", tex_path +
+            "grass.png"};
+    if (option > 1) {
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        tex_imgs[2] = tex_path + "blending_transparent_window.png";
+    }
+
     const auto num_tex = tex_imgs.size();
     std::vector<GLuint> textures(num_tex);
-    gen_textures(textures);
-    for (size_t i {0}; i < num_tex; ++i)
-        make_textures(textures[i], tex_imgs[i], {GL_REPEAT, GL_REPEAT},
-                {GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR});
+    for (std::size_t i {0}; i < num_tex - 1; ++i)
+        textures[i] = load_texture(tex_imgs[i]);
+    // grass object requires using alpha blending
+    textures[num_tex - 1] = load_texture(tex_imgs[num_tex - 1], true);
 
-    const std::vector<size_t> num_verts {cube_verts.size() / stride,
-        floor_verts.size() / stride};
+    static Shader obj_shader;
+    switch (option) {
+        case 1:
+            obj_shader = Shader {shad_path + "depth_test_01.vs",
+                shad_path + "blend_test_01.frag"};
+            break;
+        case 0:
+        default:
+            obj_shader = Shader {shad_path + "depth_test_01.vs",
+                shad_path + "depth_test_01.frag"};
+    }
 
-    game_loop(win, VAO_vec, textures, num_verts, obj_shader, option);
+    game_loop(win, VAO_vec, textures, {verts[0].size() / stride,
+            verts[1].size() / stride, verts[2].size() / stride}, obj_shader,
+            option);
 }
 
 // main loop for drawing light objects
@@ -428,59 +496,44 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
         const std::vector<GLuint> &tex_maps,
         const std::vector<size_t> &num_verts, const Shader &shad,
         const int option) {
-    int win_w, win_h;
-    glfwGetFramebufferSize(win, &win_w, &win_h);
-    const auto win_asp = float(win_w) / win_h;
-    // shader for outlining the cubes
-    const Shader color_shader {shad_path + "depth_test_01.vs",
-        shad_path + "stencil_test_01.frag"};
-    switch (option) {
-        case 2:
-            glStencilOp(GL_KEEP, GL_KEEP, GL_INCR_WRAP);
-            break;
-        case 1:
-            glStencilOp(GL_KEEP, GL_KEEP, GL_INVERT);
-            break;
-        default:
-            glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    }
-    // disable writing to the stencil buffer
-    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    const auto win_asp = window_aspect_ratio(win);
+
+    static auto blend_pos = blend_positions();
+    static std::vector<std::vector<glm::vec3>> poses {cubes_positions(),
+        {glm::vec3{0, 0, 0}}, blend_pos};
+
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;
         last_frame_time  = curr_time;
+
         glfwPollEvents();
         do_movement();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
-                GL_STENCIL_BUFFER_BIT);
+        glClearColor(0.15, 0.15, 0.15, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         const auto view = main_cam.view_matrix();
         const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
                 100.0f);
-        // drawing floor
-        glStencilMask(0x00);
-        draw_object(shad, VAO[1], tex_maps[1], view, proj, glm::mat4{},
-                num_verts[1]);
-        // drawing cubes: 1st pass
-        glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        glStencilMask(0xFF);
-        draw_object(shad, VAO[0], tex_maps[0], view, proj,
-                glm::translate(glm::mat4{}, glm::vec3{-1, 0, -1}),
-                num_verts[0]);
-        draw_object(shad, VAO[0], tex_maps[0], view, proj,
-                glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}), num_verts[0]);
-        // drawing cubes: 2nd pass
-        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-        glStencilMask(0x00);
-        glDisable(GL_DEPTH_TEST);
-        draw_object(color_shader, VAO[0], tex_maps[0], view, proj,
-                glm::scale(glm::translate(glm::mat4{}, glm::vec3{-1, 0, -1}),
-                    glm::vec3{1.1}), num_verts[0]);
-        draw_object(color_shader, VAO[0], tex_maps[0], view, proj,
-                glm::scale(glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}),
-                    glm::vec3{1.1}), num_verts[0]);
-        glStencilMask(0xFF);
-        glEnable(GL_DEPTH_TEST);
+
+        if (option == 3) { // sorting the positions of the objects
+            std::map<float, glm::vec3> sorted_pos;
+            for (size_t i {0}; i < blend_pos.size(); ++i)
+                sorted_pos[glm::length(main_cam.pos() - blend_pos[i])] =
+                    blend_pos[i];
+            blend_pos.clear();
+            // insert into the vector in the reversed order
+            for (auto it = sorted_pos.rbegin(); it != sorted_pos.rend(); ++it)
+                blend_pos.push_back(it->second);
+            poses[2] = blend_pos;
+        }
+
+        for (size_t i {0}; i < num_verts.size(); ++i)
+            for (size_t j {0}; j < poses[i].size(); ++j)
+                draw_object(shad, VAO[i], tex_maps[i], view, proj,
+                        glm::translate(glm::mat4{}, poses[i][j]),
+                        num_verts[i]);
+
         glfwSwapBuffers(win);
     }
 }
@@ -492,9 +545,6 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
     shad.use();
     const auto idx = shad.id();
 
-    glBindVertexArray(VAO);
-    glBindTexture(GL_TEXTURE_2D, tex_map);
-
     glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
             glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
@@ -502,6 +552,8 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
     glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
             glm::value_ptr(mod));
 
+    glBindVertexArray(VAO);
+    glBindTexture(GL_TEXTURE_2D, tex_map);
 
     glDrawArrays(GL_TRIANGLES, 0, num_verts);
 
