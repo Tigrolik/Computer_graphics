@@ -239,6 +239,16 @@ std::array<double, 3> rgb2hsv(const std::array<unsigned char, 3> &a) {
     return rgb2hsv(a[0], a[1], a[2]);
 }
 
+std::array<double, 3> rgb2lab(const unsigned char r, const unsigned char g,
+        const unsigned char b) {
+    return {(r + g + b) / 3.0, sqrt(1.0 / 3) * ((b << 1) - r - g),
+        1.0 / sqrt(2) * (r - g)};
+}
+
+std::array<double, 3> rgb2lab(const std::array<unsigned char, 3> &a) {
+    return rgb2hsv(a[0], a[1], a[2]);
+}
+
 std::array<unsigned char, 3> hsv2rgb(double H, const double S,
         const double V) {
     using gray_t = unsigned char;

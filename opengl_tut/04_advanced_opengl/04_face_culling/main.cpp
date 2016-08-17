@@ -1,7 +1,7 @@
 /*
  * Following tutorial on OpenGL (materials):
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Blending
+ * http://learnopengl.com/#!Advanced-OpenGL/Face-culling
  *
  * Blending options demonstration
  *
@@ -59,21 +59,17 @@ void scroll_callback(GLFWwindow*, const double, const double);
 void do_movement();
 // cleaning up
 int clean_up(const int);
-// generate VAO, VBO, EBO...
-void gen_objects(std::vector<GLuint>*, std::vector<GLuint>*);
-// bind the objects with vertex data
-void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
-        const bool, const int, const GLuint);
+// generate VAO, VBO, EBO and bind the objects with vertex data
+void load_object(GLuint&, GLuint&, const std::vector<GLfloat>&, const GLuint);
 
 // loading textures
 GLuint load_texture(const std::string&, const GLboolean = false);
 
 // drawing colored object and "lamp" box with various lighting
-void blend_test(GLFWwindow*, const int = 0);
+void face_cull_test(GLFWwindow*, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
         const glm::mat4&, const glm::mat4&, const GLuint);
-void game_loop(GLFWwindow*, const std::vector<GLuint>&,
-        const std::vector<GLuint>&, const std::vector<size_t>&,
+void game_loop(GLFWwindow*, const GLuint, const GLuint, const size_t,
         const Shader&, const int);
 
 // function to compute aspect ratio of screen's width and height
@@ -99,7 +95,7 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates various blending options:\n" <<
+        "This program demonstrates a couple of face culling options:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "up/down arrow keys - up and down, W/S - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
@@ -128,27 +124,24 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'4'};
+    static constexpr char num_options {'3'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
-            case 3:
-                blend_test(win, 3);
-                break;
             case 2:
-                blend_test(win, 2);
+                face_cull_test(win, 2);
                 break;
             case 1:
-                blend_test(win, 1);
+                face_cull_test(win, 1);
                 break;
             case 0:
             default:
-                blend_test(win, 0);
+                face_cull_test(win, 0);
         }
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        blend_test(win, 0);
+        face_cull_test(win, 0);
     }
 }
 
@@ -158,11 +151,9 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tcubes with grass without alpha blending (default)\n" <<
-        "1:\tcubes and grass (alpha blending on)\n" <<
-        "2:\tcubes and windows (not ordered, occlusions appear)\n" <<
-        "3:\tcubes and windows (ordered)\n";
-    blend_test(win, 0);
+        "0:\tcubes with back face culling (default)\n" <<
+        "1:\tcubes with front face culling (only back faces visible)\n";
+    face_cull_test(win, 0);
 }
 
 /*
@@ -180,7 +171,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Blending", nullptr, nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Face culling", nullptr, nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
@@ -202,9 +193,10 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
 
-    // enable depth and blend testing
+    // enable depth test and face culling
+    glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
+    //glEnable(GL_BLEND);
 
     return win;
 }
@@ -282,21 +274,14 @@ int clean_up(const int val) {
 }
 
 /*
- * Generate objects like Vertex Array Objects, Vertex Buffer Object using
- * pointer to std::vector (trying to achieve more general solution)
+ * Generate objects like Vertex Array Objects, Vertex Buffer Object and bind
+ * them with vertex data
  */
-void gen_objects(std::vector<GLuint> *VAO_vec, std::vector<GLuint> *VBO_vec) {
-    for (size_t i {0}; i < (*VAO_vec).size(); ++i)
-        glGenVertexArrays(1, &(*VAO_vec)[i]);
-    for (size_t i {0}; i < (*VBO_vec).size(); ++i)
-        glGenBuffers(1, &(*VBO_vec)[i]);
-}
+void load_object(GLuint &VAO, GLuint &VBO, const std::vector<GLfloat> &vertices,
+        const GLuint stride) {
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
 
-/*
- * Binding objects with vertex data.
- */
-void make_objects(const GLuint VAO, const GLuint VBO,
-        const std::vector<GLfloat> &vertices, const GLuint stride) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -347,80 +332,51 @@ GLuint load_texture(const std::string& img_fn, const GLboolean alpha) {
     return tex_id;
 }
 
-
-// get cube object vertices
-std::vector<GLfloat> cube_vertices() {
+// cube object vertices with counter-clockwise order for face culling
+std::vector<GLfloat> cube_vertices_cull() {
     return std::vector<GLfloat> {
-        // pos          tex coords
-        -0.5, -0.5, -0.5,  0, 0,
-         0.5, -0.5, -0.5,  1, 0,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5,  0.5, -0.5,  1, 1,
-        -0.5,  0.5, -0.5,  0, 1,
-        -0.5, -0.5, -0.5,  0, 0,
-
-        -0.5, -0.5,  0.5,  0, 0,
-         0.5, -0.5,  0.5,  1, 0,
-         0.5,  0.5,  0.5,  1, 1,
-         0.5,  0.5,  0.5,  1, 1,
-        -0.5,  0.5,  0.5,  0, 1,
-        -0.5, -0.5,  0.5,  0, 0,
-
-        -0.5,  0.5,  0.5,  1, 0,
-        -0.5,  0.5, -0.5,  1, 1,
-        -0.5, -0.5, -0.5,  0, 1,
-        -0.5, -0.5, -0.5,  0, 1,
-        -0.5, -0.5,  0.5,  0, 0,
-        -0.5,  0.5,  0.5,  1, 0,
-
-         0.5,  0.5,  0.5,  1, 0,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5,  0.5,  0, 0,
-         0.5,  0.5,  0.5,  1, 0,
-
-        -0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5, -0.5,  1, 1,
-         0.5, -0.5,  0.5,  1, 0,
-         0.5, -0.5,  0.5,  1, 0,
-        -0.5, -0.5,  0.5,  0, 0,
-        -0.5, -0.5, -0.5,  0, 1,
-
-        -0.5,  0.5, -0.5,  0, 1,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5,  0.5,  0.5,  1, 0,
-         0.5,  0.5,  0.5,  1, 0,
-        -0.5,  0.5,  0.5,  0, 0,
-        -0.5,  0.5, -0.5,  0, 1
-    };
-}
-
-// get floor object vertices
-std::vector<GLfloat> floor_vertices() {
-    return std::vector<GLfloat> {
-        // pos        tex coords
-         5, -0.5,  5,  2, 0,
-        -5, -0.5,  5,  0, 0,
-        -5, -0.5, -5,  0, 2,
-
-         5, -0.5,  5,  2, 0,
-        -5, -0.5, -5,  0, 2,
-         5, -0.5, -5,  2, 2
-    };
-}
-
-// get grass object vertices
-std::vector<GLfloat> blend_vertices() {
-    return std::vector<GLfloat> {
-        // pos      tex coords
-        0,  0.5, 0,  0, 0,
-        0, -0.5, 0,  0, 1,
-        1, -0.5, 0,  1, 1,
-
-        0,  0.5, 0,  0, 0,
-        1, -0.5, 0,  1, 1,
-        1,  0.5, 0,  1, 0
+        // Back face
+        -0.5, -0.5, -0.5,  0, 0, // Bottom-left
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5, -0.5, -0.5,  1, 0, // bottom-right
+         0.5,  0.5, -0.5,  1, 1, // top-right
+        -0.5, -0.5, -0.5,  0, 0, // bottom-left
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+        // Front face
+        -0.5, -0.5,  0.5,  0, 0, // bottom-left
+         0.5, -0.5,  0.5,  1, 0, // bottom-right
+         0.5,  0.5,  0.5,  1, 1, // top-right
+         0.5,  0.5,  0.5,  1, 1, // top-right
+        -0.5,  0.5,  0.5,  0, 1, // top-left
+        -0.5, -0.5,  0.5,  0, 0, // bottom-left
+        // Left face
+        -0.5,  0.5,  0.5,  1, 0, // top-right
+        -0.5,  0.5, -0.5,  1, 1, // top-left
+        -0.5, -0.5, -0.5,  0, 1, // bottom-left
+        -0.5, -0.5, -0.5,  0, 1, // bottom-left
+        -0.5, -0.5,  0.5,  0, 0, // bottom-right
+        -0.5,  0.5,  0.5,  1, 0, // top-right
+        // Right face
+         0.5,  0.5,  0.5,  1, 0, // top-left
+         0.5, -0.5, -0.5,  0, 1, // bottom-right
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5, -0.5, -0.5,  0, 1, // bottom-right
+         0.5,  0.5,  0.5,  1, 0, // top-left
+         0.5, -0.5,  0.5,  0, 0, // bottom-left
+        // Bottom face
+        -0.5, -0.5, -0.5,  0, 1, // top-right
+         0.5, -0.5, -0.5,  1, 1, // top-left
+         0.5, -0.5,  0.5,  1, 0, // bottom-left
+         0.5, -0.5,  0.5,  1, 0, // bottom-left
+        -0.5, -0.5,  0.5,  0, 0, // bottom-right
+        -0.5, -0.5, -0.5,  0, 1, // top-right
+        // Top face
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+         0.5,  0.5,  0.5,  1, 0, // bottom-right
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5,  0.5,  0.5,  1, 0, // bottom-right
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+        -0.5,  0.5,  0.5,  0, 0  // bottom-left
     };
 }
 
@@ -432,76 +388,48 @@ std::vector<glm::vec3> cubes_positions() {
     };
 }
 
-// get coordinates of grass objects
-std::vector<glm::vec3> blend_positions() {
-    return {
-        glm::vec3{-1.5, 0, -0.48},
-        glm::vec3{ 1.5, 0,  0.51},
-        glm::vec3{   0, 0,   0.7},
-        glm::vec3{-0.3, 0,  -2.3},
-        glm::vec3{ 0.5, 0,  -0.6}
-    };
-}
-
 // draw boxes on a floor
-void blend_test(GLFWwindow *win, const int option) {
-    static const std::vector<std::vector<GLfloat>> verts {
-        cube_vertices(), floor_vertices(), blend_vertices()};
-
-    // keep VAOs and VBOs for our objects in vectors
-    static const auto num_obj = verts.size();
-    std::vector<GLuint> VAO_vec (num_obj);
-    std::vector<GLuint> VBO_vec (num_obj);
+void face_cull_test(GLFWwindow *win, const int option) {
+    static const auto verts = cube_vertices_cull();
 
     const GLuint stride {5};
-    gen_objects(&VAO_vec, &VBO_vec);
-    for (std::size_t i {0}; i < num_obj; ++i)
-        make_objects(VAO_vec[i], VBO_vec[i], verts[i], stride);
+    GLuint VAO_cube {}, VBO_cube {};
+    load_object(VAO_cube, VBO_cube, verts, stride);
 
-    // loading and mapping textures
-    static std::vector<std::string> tex_imgs {tex_path +
-        "pattern4diffuseblack.jpg", tex_path + "metal.png", tex_path +
-            "grass.png"};
-    if (option > 1) {
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        tex_imgs[2] = tex_path + "blending_transparent_window.png";
-    }
+    // loading and mapping the texture
+    const GLuint tex_cube = load_texture(tex_path + "pattern4diffuseblack.jpg");
 
-    const auto num_tex = tex_imgs.size();
-    std::vector<GLuint> textures(num_tex);
-    for (std::size_t i {0}; i < num_tex - 1; ++i)
-        textures[i] = load_texture(tex_imgs[i]);
-    // grass object requires using alpha blending
-    textures[num_tex - 1] = load_texture(tex_imgs[num_tex - 1], true);
+    static const Shader obj_shader {shad_path + "depth_test_01.vs",
+        shad_path + "depth_test_01.frag"};
 
-    static Shader obj_shader;
-    switch (option) {
-        case 1:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "blend_test_01.frag"};
-            break;
-        case 0:
-        default:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_01.frag"};
-    }
-
-    game_loop(win, VAO_vec, textures, {verts[0].size() / stride,
-            verts[1].size() / stride, verts[2].size() / stride}, obj_shader,
-            option);
+    game_loop(win, VAO_cube, tex_cube, verts.size() / stride,
+            Shader {shad_path + "depth_test_01.vs",
+            shad_path + "depth_test_01.frag"}, option);
 }
 
 // main loop for drawing light objects
-void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
-        const std::vector<GLuint> &tex_maps,
-        const std::vector<size_t> &num_verts, const Shader &shad,
-        const int option) {
+void game_loop(GLFWwindow *win, const GLuint VAO, const GLuint tex_map,
+        const size_t num_verts, const Shader &shad, const int option) {
     const auto win_asp = window_aspect_ratio(win);
 
-    static auto blend_pos = blend_positions();
-    static std::vector<std::vector<glm::vec3>> poses {cubes_positions(),
-        {glm::vec3{0, 0, 0}}, blend_pos};
+    /*
+     * Make only the back faces visible (front faces culled) by either setting
+     * the option for glFrontFace to consider clockwise order instead of default
+     * counter-clockwise or using glCullFace to tell OpenGL which faces are to
+     * be discarded
+    */
+    if (option == 1) {
+        //glFrontFace(GL_CW);
+        glCullFace(GL_FRONT);
+    }
 
+    static const auto cubes_pos = cubes_positions();
+    const auto num_pos = cubes_pos.size();
+    std::vector<glm::mat4> mod_mats (num_pos);
+    for (size_t i {0}; i < num_pos; ++i)
+        mod_mats[i] = glm::translate(glm::mat4{}, cubes_pos[i]);
+
+    glClearColor(0.05, 0.05, 0.05, 1);
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;
@@ -509,30 +437,14 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
 
         glfwPollEvents();
         do_movement();
-        glClearColor(0.15, 0.15, 0.15, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto view = main_cam.view_matrix();
         const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
                 100.0f);
 
-        if (option == 3) { // sorting the positions of the objects
-            std::map<float, glm::vec3> sorted_pos;
-            for (size_t i {0}; i < blend_pos.size(); ++i)
-                sorted_pos[glm::length(main_cam.pos() - blend_pos[i])] =
-                    blend_pos[i];
-            blend_pos.clear();
-            // insert into the vector in the reversed order
-            for (auto it = sorted_pos.rbegin(); it != sorted_pos.rend(); ++it)
-                blend_pos.push_back(it->second);
-            poses[2] = blend_pos;
-        }
-
-        for (size_t i {0}; i < num_verts.size(); ++i)
-            for (size_t j {0}; j < poses[i].size(); ++j)
-                draw_object(shad, VAO[i], tex_maps[i], view, proj,
-                        glm::translate(glm::mat4{}, poses[i][j]),
-                        num_verts[i]);
+        for (size_t i {0}; i < num_pos; ++i)
+            draw_object(shad, VAO, tex_map, view, proj, mod_mats[i], num_verts);
 
         glfwSwapBuffers(win);
     }
