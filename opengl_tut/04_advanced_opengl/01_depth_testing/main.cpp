@@ -69,7 +69,7 @@ void gen_textures(std::vector<GLuint>&);
 void make_textures(const GLuint, const std::string&,
         const GLenum, const GLenum);
 
-// drawing colored object and "lamp" box with various lighting
+// drawing objects
 void depth_test(GLFWwindow*, const int = 0);
 void draw_objects(GLFWwindow*, const std::vector<GLfloat>&,
         const std::vector<GLfloat>&, const int = 0);

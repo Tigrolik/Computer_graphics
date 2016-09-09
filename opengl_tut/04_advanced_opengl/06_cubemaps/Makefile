@@ -19,10 +19,9 @@ CXXFLAGS = -std=c++11 -Weffc++ $(COMP_OPTIONS)
 DEBUG_FLAGS = -O0 -g -D _DEBUG
 RELEASE_FLAGS = -O3 -D NDEBUG
 
-# Flags for OpenGL (added -lassimp for loading models)
+# Flags for OpenGL
 LIBS = -lGL -lGLU -lGLEW -lGLEW -lglfw -lXxf86vm -ldl -lX11 -lpthread\
 	-lXrandr -lXi -lXinerama -lXcursor -lSOIL -lassimp
-
 
 SOURCES := $(wildcard *.cpp)
 TARGET := main

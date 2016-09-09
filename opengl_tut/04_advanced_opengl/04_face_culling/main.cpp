@@ -65,7 +65,11 @@ void load_object(GLuint&, GLuint&, const std::vector<GLfloat>&, const GLuint);
 // loading textures
 GLuint load_texture(const std::string&, const GLboolean = false);
 
-// drawing colored object and "lamp" box with various lighting
+// define vertices
+std::vector<GLfloat> cube_vertices_cull_ccw();
+std::vector<GLfloat> cube_vertices_cull_cw();
+
+// drawing objects
 void face_cull_test(GLFWwindow*, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
         const glm::mat4&, const glm::mat4&, const GLuint);
@@ -169,6 +173,17 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+
+    // debugging
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
+    GLint flags;
+    glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+    if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+        std::cout << "debugging enabled\n";
+    else
+        std::cout << "no debugging\n";
+
 
     // create a window object
     GLFWwindow *win = glfwCreateWindow(w, h, "Face culling", nullptr, nullptr);
@@ -333,7 +348,7 @@ GLuint load_texture(const std::string& img_fn, const GLboolean alpha) {
 }
 
 // cube object vertices with counter-clockwise order for face culling
-std::vector<GLfloat> cube_vertices_cull() {
+std::vector<GLfloat> cube_vertices_cull_ccw() {
     return std::vector<GLfloat> {
         // Back face
         -0.5, -0.5, -0.5,  0, 0, // Bottom-left
@@ -380,6 +395,54 @@ std::vector<GLfloat> cube_vertices_cull() {
     };
 }
 
+// cube object vertices with clockwise order for face culling
+std::vector<GLfloat> cube_vertices_cull_cw() {
+    return std::vector<GLfloat> {
+        // Back face
+        -0.5, -0.5, -0.5,  0, 0, // Bottom-left
+         0.5, -0.5, -0.5,  1, 0, // bottom-right
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5,  0.5, -0.5,  1, 1, // top-right
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+        -0.5, -0.5, -0.5,  0, 0, // bottom-left
+        // Front face
+        -0.5, -0.5,  0.5,  0, 0, // bottom-left
+         0.5,  0.5,  0.5,  1, 1, // top-right
+         0.5, -0.5,  0.5,  1, 0, // bottom-right
+         0.5,  0.5,  0.5,  1, 1, // top-right
+        -0.5, -0.5,  0.5,  0, 0, // bottom-left
+        -0.5,  0.5,  0.5,  0, 1, // top-left
+        // Left face
+        -0.5,  0.5,  0.5,  1, 0, // top-right
+        -0.5, -0.5, -0.5,  0, 1, // bottom-left
+        -0.5,  0.5, -0.5,  1, 1, // top-left
+        -0.5, -0.5, -0.5,  0, 1, // bottom-left
+        -0.5,  0.5,  0.5,  1, 0, // top-right
+        -0.5, -0.5,  0.5,  0, 0, // bottom-right
+        // Right face
+         0.5,  0.5,  0.5,  1, 0, // top-left
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5, -0.5, -0.5,  0, 1, // bottom-right
+         0.5, -0.5, -0.5,  0, 1, // bottom-right
+         0.5, -0.5,  0.5,  0, 0, // bottom-left
+         0.5,  0.5,  0.5,  1, 0, // top-left
+        // Bottom face
+        -0.5, -0.5, -0.5,  0, 1, // top-right
+         0.5, -0.5,  0.5,  1, 0, // bottom-left
+         0.5, -0.5, -0.5,  1, 1, // top-left
+         0.5, -0.5,  0.5,  1, 0, // bottom-left
+        -0.5, -0.5, -0.5,  0, 1, // top-right
+        -0.5, -0.5,  0.5,  0, 0, // bottom-right
+        // Top face
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+         0.5,  0.5, -0.5,  1, 1, // top-right
+         0.5,  0.5,  0.5,  1, 0, // bottom-right
+        -0.5,  0.5, -0.5,  0, 1, // top-left
+         0.5,  0.5,  0.5,  1, 0, // bottom-right
+        -0.5,  0.5,  0.5,  0, 0  // bottom-left
+    };
+}
+
 // get coordinates of cubes objects
 std::vector<glm::vec3> cubes_positions() {
     return {
@@ -390,7 +453,7 @@ std::vector<glm::vec3> cubes_positions() {
 
 // draw boxes on a floor
 void face_cull_test(GLFWwindow *win, const int option) {
-    static const auto verts = cube_vertices_cull();
+    static const auto verts = cube_vertices_cull_ccw();
 
     const GLuint stride {5};
     GLuint VAO_cube {}, VBO_cube {};
@@ -416,8 +479,10 @@ void game_loop(GLFWwindow *win, const GLuint VAO, const GLuint tex_map,
      * Make only the back faces visible (front faces culled) by either setting
      * the option for glFrontFace to consider clockwise order instead of default
      * counter-clockwise or using glCullFace to tell OpenGL which faces are to
-     * be discarded
-    */
+     * be discarded. There is also the third option: use cube_vertices_cull_cw()
+     * function to load the vertices in already clockwise order (then do not
+     * change the default face cull parameters)
+     */
     if (option == 1) {
         //glFrontFace(GL_CW);
         glCullFace(GL_FRONT);

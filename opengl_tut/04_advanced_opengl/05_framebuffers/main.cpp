@@ -1,9 +1,10 @@
 /*
  * Following tutorial on OpenGL (materials):
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Blending
+ * http://learnopengl.com/#!Advanced-OpenGL/Framebuffers
  *
- * Blending options demonstration
+ * Introduce the use of framebuffers and effects that can be applied to scenes
+ * with the use of the framebuffers and convolution kernels
  *
  */
 
@@ -63,18 +64,28 @@ int clean_up(const int);
 void gen_objects(std::vector<GLuint>*, std::vector<GLuint>*);
 // bind the objects with vertex data
 void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
-        const bool, const int, const GLuint);
-
+        const bool, const int, const GLuint, const GLuint);
 // loading textures
 GLuint load_texture(const std::string&, const GLboolean = false);
 
+// create framebuffer
+GLuint make_framebuffer();
+//generate texture for the framebuffer
+GLuint make_texture_fb(const int, const int);
+GLuint make_texture_fb(GLFWwindow*);
+// create a renderbuffer
+GLuint make_renderbuffer(const int, const int);
+GLuint make_renderbuffer(GLFWwindow*);
+// choose a shader
+Shader shader_for_framebuffer(const int);
+
 // drawing objects
-void blend_test(GLFWwindow*, const int = 0);
+void fbuf_test(GLFWwindow*, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
         const glm::mat4&, const glm::mat4&, const GLuint);
+void draw_framebuffer(const Shader&, const GLuint, const GLuint, const GLuint);
 void game_loop(GLFWwindow*, const std::vector<GLuint>&,
-        const std::vector<GLuint>&, const std::vector<size_t>&,
-        const Shader&, const int);
+        const std::vector<GLuint>&, const std::vector<size_t>&, const int);
 
 // function to compute aspect ratio of screen's width and height
 float window_aspect_ratio(GLFWwindow*);
@@ -99,7 +110,8 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates various blending options:\n" <<
+        "This program demonstrates various post-processing options " <<
+        "involving framebuffers:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "up/down arrow keys - up and down, W/S - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
@@ -128,27 +140,36 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'4'};
+    static constexpr char num_options {'7'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
+            case 6:
+                fbuf_test(win, 6);
+                break;
+            case 5:
+                fbuf_test(win, 5);
+                break;
+            case 4:
+                fbuf_test(win, 4);
+                break;
             case 3:
-                blend_test(win, 3);
+                fbuf_test(win, 3);
                 break;
             case 2:
-                blend_test(win, 2);
+                fbuf_test(win, 2);
                 break;
             case 1:
-                blend_test(win, 1);
+                fbuf_test(win, 1);
                 break;
             case 0:
             default:
-                blend_test(win, 0);
+                fbuf_test(win, 0);
         }
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        blend_test(win, 0);
+        fbuf_test(win, 0);
     }
 }
 
@@ -158,11 +179,14 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tcubes with grass without alpha blending (default)\n" <<
-        "1:\tcubes and grass (alpha blending on)\n" <<
-        "2:\tcubes and windows (not ordered, occlusions appear)\n" <<
-        "3:\tcubes and windows (ordered)\n";
-    blend_test(win, 0);
+        "0:\tcontainers on a metal floor (default)\n" <<
+        "1:\tcolors (from the previous scene) inverted\n" <<
+        "2:\tgrayscale scene\n" <<
+        "3:\t\"sharpened\" scene\n" <<
+        "4:\tblurred scene\n" <<
+        "5:\tscene with \"edge detection\"\n" <<
+        "6:\toriginal scene with a rear-view mirror\n";
+    fbuf_test(win, 0);
 }
 
 /*
@@ -180,7 +204,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Blending", nullptr, nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Framebuffers", nullptr, nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
@@ -201,10 +225,6 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
 
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
-
-    // enable depth and blend testing
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
 
     return win;
 }
@@ -296,7 +316,8 @@ void gen_objects(std::vector<GLuint> *VAO_vec, std::vector<GLuint> *VBO_vec) {
  * Binding objects with vertex data.
  */
 void make_objects(const GLuint VAO, const GLuint VBO,
-        const std::vector<GLfloat> &vertices, const GLuint stride) {
+        const std::vector<GLfloat> &vertices, const GLuint stride,
+        const GLuint offset) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -304,12 +325,12 @@ void make_objects(const GLuint VAO, const GLuint VBO,
             GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)0);
+    glVertexAttribPointer(0, offset, GL_FLOAT, GL_FALSE,
+            stride * sizeof(GLfloat), (GLvoid*)0);
 
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)(3 * sizeof(GLfloat)));
+            (GLvoid*)(offset * sizeof(GLfloat)));
 
     glBindVertexArray(0);
 }
@@ -347,6 +368,104 @@ GLuint load_texture(const std::string& img_fn, const GLboolean alpha) {
     return tex_id;
 }
 
+/*
+ * Create framebuffer
+ */
+GLuint make_framebuffer() {
+    // create a framebuffer object
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+
+    // bind the framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    return fbo;
+}
+
+/*
+ * Generate texture for the framebuffer
+ */
+GLuint make_texture_fb(const int win_w, const int win_h) {
+    GLuint tex_id;
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, win_w, win_h, 0, GL_RGB,
+            GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // attach texture to the currently bound framebuffer object
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+            tex_id, 0);
+    return tex_id;
+}
+
+// version with GLFWwindow as a parameter
+GLuint make_texture_fb(GLFWwindow *win) {
+    // get window size
+    int win_w, win_h;
+    glfwGetFramebufferSize(win, &win_w, &win_h);
+
+    return make_texture_fb(win_w, win_h);
+}
+
+/*
+ * Create a renderbuffer
+ */
+GLuint make_renderbuffer(const int win_w, const int win_h) {
+    GLuint rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, win_w, win_h);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+    // attach the renderbuffer object to the depth and stencil attachment
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+            GL_RENDERBUFFER, rbo);
+
+    // check the framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error {"Framebuffer is not complete"};
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return rbo;
+}
+
+// version with GLFWwindow as a parameter
+GLuint make_renderbuffer(GLFWwindow *win) {
+    // get window size
+    int win_w, win_h;
+    glfwGetFramebufferSize(win, &win_w, &win_h);
+    return make_renderbuffer(win_w, win_h);
+}
+
+// choose a shader based on the option
+Shader shader_for_framebuffer(const int option) {
+    switch (option) {
+        case 5:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "framebuffer_05.frag"};
+        case 4:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "framebuffer_04.frag"};
+        case 3:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "framebuffer_03.frag"};
+        case 2:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "framebuffer_02.frag"};
+        case 1:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "framebuffer_01.frag"};
+        case 0:
+        default:
+            return Shader {shad_path + "framebuffer_01.vs",
+                shad_path + "depth_test_01.frag"};
+    }
+}
 
 // get cube object vertices
 std::vector<GLfloat> cube_vertices() {
@@ -410,17 +529,31 @@ std::vector<GLfloat> floor_vertices() {
     };
 }
 
-// get grass object vertices
-std::vector<GLfloat> blend_vertices() {
+// get quad object vertices
+std::vector<GLfloat> quad_vertices() {
+    return std::vector<GLfloat> {
+        // pos, tex coords
+        -1,  1, 0, 1,
+        -1, -1, 0, 0,
+         1, -1, 1, 0,
+
+        -1,  1, 0, 1,
+         1, -1, 1, 0,
+         1,  1, 1, 1
+    };
+}
+
+// get quad object vertices
+std::vector<GLfloat> mirror_quad_vertices() {
     return std::vector<GLfloat> {
         // pos      tex coords
-        0,  0.5, 0,  0, 0,
-        0, -0.5, 0,  0, 1,
-        1, -0.5, 0,  1, 1,
+        -0.3f, 1.0f, 0, 1,
+        -0.3f, 0.7f, 0, 0,
+         0.3f, 0.7f, 1, 0,
 
-        0,  0.5, 0,  0, 0,
-        1, -0.5, 0,  1, 1,
-        1,  0.5, 0,  1, 0
+        -0.3f, 1.0f, 0, 1,
+         0.3f, 0.7f, 1, 0,
+         0.3f, 1.0f, 1, 1
     };
 }
 
@@ -432,75 +565,57 @@ std::vector<glm::vec3> cubes_positions() {
     };
 }
 
-// get coordinates of grass objects
-std::vector<glm::vec3> blend_positions() {
-    return {
-        glm::vec3{-1.5, 0, -0.48},
-        glm::vec3{ 1.5, 0,  0.51},
-        glm::vec3{   0, 0,   0.7},
-        glm::vec3{-0.3, 0,  -2.3},
-        glm::vec3{ 0.5, 0,  -0.6}
-    };
-}
-
 // draw boxes on a floor
-void blend_test(GLFWwindow *win, const int option) {
+void fbuf_test(GLFWwindow *win, const int option) {
     static const std::vector<std::vector<GLfloat>> verts {
-        cube_vertices(), floor_vertices(), blend_vertices()};
+        cube_vertices(), floor_vertices(), quad_vertices(),
+            mirror_quad_vertices()};
 
-    // keep VAOs and VBOs for our objects in vectors
+    static const std::vector<GLuint> strides {5, 5, 4, 4};
+    static const std::vector<GLuint> offsets {3, 3, 2, 2};
+
     static const auto num_obj = verts.size();
+    if (num_obj != strides.size() || num_obj != offsets.size())
+        throw std::runtime_error
+        {"Vectors of vertices mismatch vectors of strides and offsets"};
+    // keep VAOs and VBOs for our objects in vectors
     std::vector<GLuint> VAO_vec (num_obj);
     std::vector<GLuint> VBO_vec (num_obj);
 
-    const GLuint stride {5};
     gen_objects(&VAO_vec, &VBO_vec);
     for (std::size_t i {0}; i < num_obj; ++i)
-        make_objects(VAO_vec[i], VBO_vec[i], verts[i], stride);
+        make_objects(VAO_vec[i], VBO_vec[i], verts[i], strides[i], offsets[i]);
 
     // loading and mapping textures
     static std::vector<std::string> tex_imgs {tex_path +
-        "pattern4diffuseblack.jpg", tex_path + "metal.png", tex_path +
-            "grass.png"};
-    if (option > 1) {
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        tex_imgs[2] = tex_path + "blending_transparent_window.png";
-    }
+        "container.jpg", tex_path + "metal.png"};
 
     const auto num_tex = tex_imgs.size();
     std::vector<GLuint> textures(num_tex);
-    for (std::size_t i {0}; i < num_tex - 1; ++i)
+    for (std::size_t i {0}; i < num_tex; ++i)
         textures[i] = load_texture(tex_imgs[i]);
-    // grass object requires using alpha blending
-    textures[num_tex - 1] = load_texture(tex_imgs[num_tex - 1], true);
 
-    static Shader obj_shader;
-    switch (option) {
-        case 1:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "blend_test_01.frag"};
-            break;
-        case 0:
-        default:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_01.frag"};
-    }
+    // put the framebuffer objects into the corresponding vectors
+    VAO_vec.push_back(make_framebuffer());
+    textures.push_back(make_texture_fb(win));
+    VBO_vec.push_back(make_renderbuffer(win));
 
-    game_loop(win, VAO_vec, textures, {verts[0].size() / stride,
-            verts[1].size() / stride, verts[2].size() / stride}, obj_shader,
-            option);
+    game_loop(win, VAO_vec, textures, {verts[0].size() / strides[0],
+            verts[1].size() / strides[1], verts[2].size() / strides[2],
+            verts[3].size() / strides[3]}, option);
 }
 
 // main loop for drawing light objects
 void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
         const std::vector<GLuint> &tex_maps,
-        const std::vector<size_t> &num_verts, const Shader &shad,
-        const int option) {
+        const std::vector<size_t> &num_verts, const int option) {
     const auto win_asp = window_aspect_ratio(win);
 
-    static auto blend_pos = blend_positions();
-    static std::vector<std::vector<glm::vec3>> poses {cubes_positions(),
-        {glm::vec3{0, 0, 0}}, blend_pos};
+    const static Shader obj_shader {shad_path + "depth_test_01.vs",
+        shad_path + "depth_test_01.frag"};
+    const static Shader frame_shader {shader_for_framebuffer(option)};
+
+    static const std::vector<glm::vec3> poses {cubes_positions()};
 
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
@@ -509,33 +624,49 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
 
         glfwPollEvents();
         do_movement();
+
+        // Bind to framebuffer and draw to color texture
+        glBindFramebuffer(GL_FRAMEBUFFER, VAO[VAO.size() - 1]);
         glClearColor(0.15, 0.15, 0.15, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
 
-        const auto view = main_cam.view_matrix();
-        const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
-                100.0f);
-
-        if (option == 3) { // sorting the positions of the objects
-            std::map<float, glm::vec3> sorted_pos;
-            for (size_t i {0}; i < blend_pos.size(); ++i)
-                sorted_pos[glm::length(main_cam.pos() - blend_pos[i])] =
-                    blend_pos[i];
-            blend_pos.clear();
-            // insert into the vector in the reversed order
-            for (auto it = sorted_pos.rbegin(); it != sorted_pos.rend(); ++it)
-                blend_pos.push_back(it->second);
-            poses[2] = blend_pos;
+        glm::mat4 proj {}, view {};
+        if (option == 6) {
+            // making rear view mirror
+            main_cam.rear_view(); // set the rear view
+            view = main_cam.view_matrix();
+            main_cam.rear_view(); // return the original view
+            proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f, 100.0f);
+            draw_object(obj_shader, VAO[1], tex_maps[1], view, proj,
+                    glm::mat4{}, num_verts[1]);
+            for (size_t i {0}; i < 2; ++i)
+                draw_object(obj_shader, VAO[0], tex_maps[0], view, proj,
+                        glm::translate(glm::mat4{}, poses[i]), num_verts[0]);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClearColor(0.15, 0.15, 0.15, 1);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 
-        for (size_t i {0}; i < num_verts.size(); ++i)
-            for (size_t j {0}; j < poses[i].size(); ++j)
-                draw_object(shad, VAO[i], tex_maps[i], view, proj,
-                        glm::translate(glm::mat4{}, poses[i][j]),
-                        num_verts[i]);
+        view = main_cam.view_matrix();
+        proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f, 100.0f);
+        // draw objects
+        draw_object(obj_shader, VAO[1], tex_maps[1], view, proj, glm::mat4{},
+                num_verts[1]);
+        for (size_t i {0}; i < 2; ++i)
+            draw_object(obj_shader, VAO[0], tex_maps[0], view, proj,
+                    glm::translate(glm::mat4{}, poses[i]), num_verts[0]);
+
+        // draw the framebuffer
+        if (option == 6) // drawing with the rear view mirror
+            draw_framebuffer(frame_shader, VAO[3], tex_maps[2], num_verts[2]);
+        else
+            draw_framebuffer(frame_shader, VAO[2], tex_maps[2], num_verts[2]);
 
         glfwSwapBuffers(win);
     }
+
+    glDeleteFramebuffers(1, &VAO[VAO.size() - 1]);
 }
 
 // drawing an object
@@ -558,5 +689,27 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
     glDrawArrays(GL_TRIANGLES, 0, num_verts);
 
     glBindVertexArray(0);
+}
+
+/*
+ * Bind to the default framebuffer and draw the quad plane with attached
+ * screen texture
+ */
+void draw_framebuffer(const Shader &shad, const GLuint VAO,
+        const GLuint tex_map, const GLuint num_verts) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // clear all relevant buffers
+    //glClearColor(1, 1, 1, 1);
+    //glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+
+    shad.use();
+
+    glBindVertexArray(VAO);
+    glBindTexture(GL_TEXTURE_2D, tex_map);
+    glDrawArrays(GL_TRIANGLES, 0, num_verts);
+
+    glBindVertexArray(0);
+
 }
 

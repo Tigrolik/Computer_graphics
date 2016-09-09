@@ -1,9 +1,12 @@
 /*
  * Following tutorial on OpenGL (materials):
+ * http://learnopengl.com/#!Advanced-OpenGL/Cubemaps
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Blending
+ * Introduce the use of cubemaps, displaying different kinds of skyboxes as well
+ * as reflection and refraction effects applied to either a box or model.
  *
- * Blending options demonstration
+ * Also changed the moving in the Camera class, now left-right movement happens
+ * not along the axis but proper sideways, depending on where the camera looks
  *
  */
 
@@ -25,10 +28,12 @@
 
 #include "Shader.h"
 #include "Camera.h"
+#include "Model.h"
 
 // paths to the folder where we keep shaders and textures: global vars
 static const std::string shad_path {"../../shaders/"};
 static const std::string tex_path {"../../images/"};
+static const std::string model_path {"../../models/"};
 
 // tracking which keys have been pressed/released (for smooth movement)
 static bool keys[1024];
@@ -63,18 +68,31 @@ int clean_up(const int);
 void gen_objects(std::vector<GLuint>*, std::vector<GLuint>*);
 // bind the objects with vertex data
 void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
-        const bool, const int, const GLuint);
-
+        const bool, const int, const GLuint, const GLuint, const GLuint,
+        const GLboolean = false);
 // loading textures
 GLuint load_texture(const std::string&, const GLboolean = false);
 
+// load textures for a cubemap (skybox)
+GLuint make_cubemap(const std::vector<std::string>&);
+// get a shader depending on the option
+Shader shader_for_object(const int);
+
+// few function for retrieving vertices
+std::vector<GLfloat> skybox_vertices();
+std::vector<GLfloat> cube_vertices();
+std::vector<GLfloat> cube_normal_vertices();
+
 // drawing objects
-void blend_test(GLFWwindow*, const int = 0);
+void cubemap_test(GLFWwindow*, const int = 0);
 void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
-        const glm::mat4&, const glm::mat4&, const GLuint);
+        const glm::mat4&, const glm::mat4&, const GLuint = 36, const int = 0);
 void game_loop(GLFWwindow*, const std::vector<GLuint>&,
-        const std::vector<GLuint>&, const std::vector<size_t>&,
-        const Shader&, const int);
+        const std::vector<GLuint>&, const int = 0);
+void draw_skybox(const Shader&, const GLuint, const GLuint, const glm::mat4&,
+        const glm::mat4&);
+void draw_model(Model&, const Shader&, const GLuint, const glm::mat4&,
+        const glm::mat4&, const glm::mat4&, const int);
 
 // function to compute aspect ratio of screen's width and height
 float window_aspect_ratio(GLFWwindow*);
@@ -99,7 +117,8 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates various blending options:\n" <<
+        "This program demonstrates various skyboxes and effects (reflection" <<
+        "and refraction) applied to a box and model:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "up/down arrow keys - up and down, W/S - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
@@ -128,27 +147,33 @@ int main(int argc, char *argv[]) try {
  * Process user input
  */
 void process_input(GLFWwindow *win, const std::string &inp) {
-    static constexpr char num_options {'4'};
+    static constexpr char num_options {'6'};
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
         switch (inp_char - '0') {
+            case 5:
+                cubemap_test(win, 5);
+                break;
+            case 4:
+                cubemap_test(win, 4);
+                break;
             case 3:
-                blend_test(win, 3);
+                cubemap_test(win, 3);
                 break;
             case 2:
-                blend_test(win, 2);
+                cubemap_test(win, 2);
                 break;
             case 1:
-                blend_test(win, 1);
+                cubemap_test(win, 1);
                 break;
             case 0:
             default:
-                blend_test(win, 0);
+                cubemap_test(win, 0);
         }
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        blend_test(win, 0);
+        cubemap_test(win, 0);
     }
 }
 
@@ -158,11 +183,13 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tcubes with grass without alpha blending (default)\n" <<
-        "1:\tcubes and grass (alpha blending on)\n" <<
-        "2:\tcubes and windows (not ordered, occlusions appear)\n" <<
-        "3:\tcubes and windows (ordered)\n";
-    blend_test(win, 0);
+        "0:\tbox in a skybox with mountains and yellow light (default)\n" <<
+        "1:\t\"mirror\" box in snowy mountains\n" <<
+        "2:\t\"chrome plated\" model (suit) in skybox with lake\n" <<
+        "3:\t\"glass\" box in a moonlight environment with a lake\n" <<
+        "4:\t\"glass\" suit plus fiery sky and a mountain with light\n" <<
+        "5:\tsuit with some parts reflecting colors in interstellar skybox\n";
+    cubemap_test(win, 0);
 }
 
 /*
@@ -180,7 +207,7 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Blending", nullptr, nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Cubemaps", nullptr, nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
@@ -202,9 +229,8 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
 
-    // enable depth and blend testing
+    // enable the depth test
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
 
     return win;
 }
@@ -296,7 +322,8 @@ void gen_objects(std::vector<GLuint> *VAO_vec, std::vector<GLuint> *VBO_vec) {
  * Binding objects with vertex data.
  */
 void make_objects(const GLuint VAO, const GLuint VBO,
-        const std::vector<GLfloat> &vertices, const GLuint stride) {
+        const std::vector<GLfloat> &vertices, const GLuint stride,
+        const GLuint offset, const GLuint num_att, const GLboolean is_skybox) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -304,12 +331,14 @@ void make_objects(const GLuint VAO, const GLuint VBO,
             GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)0);
+    glVertexAttribPointer(0, offset, GL_FLOAT, GL_FALSE,
+            stride * sizeof(GLfloat), (GLvoid*)0);
 
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)(3 * sizeof(GLfloat)));
+    if (!is_skybox) {
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, num_att, GL_FLOAT, GL_FALSE,
+                stride * sizeof(GLfloat), (GLvoid*)(offset * sizeof(GLfloat)));
+    }
 
     glBindVertexArray(0);
 }
@@ -347,8 +376,99 @@ GLuint load_texture(const std::string& img_fn, const GLboolean alpha) {
     return tex_id;
 }
 
+GLuint make_cubemap(const std::vector<std::string>& texture_faces) {
+    // generating a texture... typical steps
+    GLuint tex_id;
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, tex_id);
 
-// get cube object vertices
+    // setting textures to the faces of the cubemap
+    int img_w, img_h;
+    //unsigned char* img;
+    for (GLuint i {0}; i < texture_faces.size(); ++i) {
+        unsigned char *img = SOIL_load_image(texture_faces[i].c_str(),
+                &img_w, &img_h, 0, SOIL_LOAD_RGB);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB,
+                img_w, img_h, 0, GL_RGB, GL_UNSIGNED_BYTE, img);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return tex_id;
+}
+
+// choose a shader based on the option
+Shader shader_for_object(const int option) {
+    switch (option) {
+        case 5:
+            return Shader {shad_path + "cubemap_test_03.vs",
+                shad_path + "cubemap_test_04.frag"};
+        case 3:
+        case 4:
+            return Shader {shad_path + "cubemap_test_02.vs",
+                shad_path + "cubemap_test_03.frag"};
+        case 2:
+        case 1:
+            return Shader {shad_path + "cubemap_test_02.vs",
+                shad_path + "cubemap_test_02.frag"};
+        case 0:
+        default:
+            return Shader {shad_path + "depth_test_01.vs",
+                shad_path + "depth_test_01.frag"};
+    }
+}
+
+// skybox vertices
+std::vector<GLfloat> skybox_vertices() {
+    return std::vector<GLfloat> {
+        -1,  1, -1,
+        -1, -1, -1,
+         1, -1, -1,
+         1, -1, -1,
+         1,  1, -1,
+        -1,  1, -1,
+
+        -1, -1,  1,
+        -1, -1, -1,
+        -1,  1, -1,
+        -1,  1, -1,
+        -1,  1,  1,
+        -1, -1,  1,
+
+         1, -1, -1,
+         1, -1,  1,
+         1,  1,  1,
+         1,  1,  1,
+         1,  1, -1,
+         1, -1, -1,
+
+        -1, -1,  1,
+        -1,  1,  1,
+         1,  1,  1,
+         1,  1,  1,
+         1, -1,  1,
+        -1, -1,  1,
+
+        -1,  1, -1,
+         1,  1, -1,
+         1,  1,  1,
+         1,  1,  1,
+        -1,  1,  1,
+        -1,  1, -1,
+
+        -1, -1, -1,
+        -1, -1,  1,
+         1, -1, -1,
+         1, -1, -1,
+        -1, -1,  1,
+         1, -1,  1
+    };
+}
+
+// get cube object vertices with normal vectors
 std::vector<GLfloat> cube_vertices() {
     return std::vector<GLfloat> {
         // pos          tex coords
@@ -396,112 +516,109 @@ std::vector<GLfloat> cube_vertices() {
     };
 }
 
-// get floor object vertices
-std::vector<GLfloat> floor_vertices() {
+// get cube object vertices
+std::vector<GLfloat> cube_normal_vertices() {
     return std::vector<GLfloat> {
-        // pos        tex coords
-         5, -0.5,  5,  2, 0,
-        -5, -0.5,  5,  0, 0,
-        -5, -0.5, -5,  0, 2,
+        // pos            // normals
+        -0.5, -0.5, -0.5,  0,  0, -1,
+         0.5, -0.5, -0.5,  0,  0, -1,
+         0.5,  0.5, -0.5,  0,  0, -1,
+         0.5,  0.5, -0.5,  0,  0, -1,
+        -0.5,  0.5, -0.5,  0,  0, -1,
+        -0.5, -0.5, -0.5,  0,  0, -1,
 
-         5, -0.5,  5,  2, 0,
-        -5, -0.5, -5,  0, 2,
-         5, -0.5, -5,  2, 2
+        -0.5, -0.5,  0.5,  0,  0,  1,
+         0.5, -0.5,  0.5,  0,  0,  1,
+         0.5,  0.5,  0.5,  0,  0,  1,
+         0.5,  0.5,  0.5,  0,  0,  1,
+        -0.5,  0.5,  0.5,  0,  0,  1,
+        -0.5, -0.5,  0.5,  0,  0,  1,
+
+        -0.5,  0.5,  0.5, -1,  0,  0,
+        -0.5,  0.5, -0.5, -1,  0,  0,
+        -0.5, -0.5, -0.5, -1,  0,  0,
+        -0.5, -0.5, -0.5, -1,  0,  0,
+        -0.5, -0.5,  0.5, -1,  0,  0,
+        -0.5,  0.5,  0.5, -1,  0,  0,
+
+         0.5,  0.5,  0.5,  1,  0,  0,
+         0.5,  0.5, -0.5,  1,  0,  0,
+         0.5, -0.5, -0.5,  1,  0,  0,
+         0.5, -0.5, -0.5,  1,  0,  0,
+         0.5, -0.5,  0.5,  1,  0,  0,
+         0.5,  0.5,  0.5,  1,  0,  0,
+
+        -0.5, -0.5, -0.5,  0, -1,  0,
+         0.5, -0.5, -0.5,  0, -1,  0,
+         0.5, -0.5,  0.5,  0, -1,  0,
+         0.5, -0.5,  0.5,  0, -1,  0,
+        -0.5, -0.5,  0.5,  0, -1,  0,
+        -0.5, -0.5, -0.5,  0, -1,  0,
+
+        -0.5,  0.5, -0.5,  0,  1,  0,
+         0.5,  0.5, -0.5,  0,  1,  0,
+         0.5,  0.5,  0.5,  0,  1,  0,
+         0.5,  0.5,  0.5,  0,  1,  0,
+        -0.5,  0.5,  0.5,  0,  1,  0,
+        -0.5,  0.5, -0.5,  0,  1,  0
     };
 }
 
-// get grass object vertices
-std::vector<GLfloat> blend_vertices() {
-    return std::vector<GLfloat> {
-        // pos      tex coords
-        0,  0.5, 0,  0, 0,
-        0, -0.5, 0,  0, 1,
-        1, -0.5, 0,  1, 1,
+// main testing function: loading object(s) and skybox
+void cubemap_test(GLFWwindow *win, const int option) {
+    static std::vector<std::vector<GLfloat>> verts {skybox_vertices(),
+        cube_vertices()};
+    static std::vector<GLuint> strides {3, 5};
+    static std::vector<GLuint> offsets {3, 3};
+    if (option == 1 || option == 3) {
+        verts[1] = cube_normal_vertices();
+        strides[1] = 6;
+    }
 
-        0,  0.5, 0,  0, 0,
-        1, -0.5, 0,  1, 1,
-        1,  0.5, 0,  1, 0
-    };
-}
-
-// get coordinates of cubes objects
-std::vector<glm::vec3> cubes_positions() {
-    return {
-        glm::vec3{-1, 0, -1},
-        glm::vec3{ 2, 0,  0}
-    };
-}
-
-// get coordinates of grass objects
-std::vector<glm::vec3> blend_positions() {
-    return {
-        glm::vec3{-1.5, 0, -0.48},
-        glm::vec3{ 1.5, 0,  0.51},
-        glm::vec3{   0, 0,   0.7},
-        glm::vec3{-0.3, 0,  -2.3},
-        glm::vec3{ 0.5, 0,  -0.6}
-    };
-}
-
-// draw boxes on a floor
-void blend_test(GLFWwindow *win, const int option) {
-    static const std::vector<std::vector<GLfloat>> verts {
-        cube_vertices(), floor_vertices(), blend_vertices()};
-
-    // keep VAOs and VBOs for our objects in vectors
     static const auto num_obj = verts.size();
+    if (num_obj != strides.size() || num_obj != offsets.size())
+        throw std::runtime_error
+        {"Vectors of vertices mismatch vectors of strides and offsets"};
+    // keep VAOs and VBOs for our objects in vectors
     std::vector<GLuint> VAO_vec (num_obj);
     std::vector<GLuint> VBO_vec (num_obj);
 
-    const GLuint stride {5};
     gen_objects(&VAO_vec, &VBO_vec);
-    for (std::size_t i {0}; i < num_obj; ++i)
-        make_objects(VAO_vec[i], VBO_vec[i], verts[i], stride);
+    // skybox and container
+    make_objects(VAO_vec[0], VBO_vec[0], verts[0], strides[0], offsets[0], 3,
+                true);
+    if (option > 0) // crutches...
+        make_objects(VAO_vec[1], VBO_vec[1], verts[1], strides[1], offsets[1],
+                3, false);
+    else
+        make_objects(VAO_vec[1], VBO_vec[1], verts[1], strides[1], offsets[1],
+                2, false);
 
-    // loading and mapping textures
-    static std::vector<std::string> tex_imgs {tex_path +
-        "pattern4diffuseblack.jpg", tex_path + "metal.png", tex_path +
-            "grass.png"};
-    if (option > 1) {
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        tex_imgs[2] = tex_path + "blending_transparent_window.png";
-    }
+    // load a cubemap
+    //const std::string skybox_path {tex_path + "skybox_01/"};
+    const std::string skybox_path {tex_path + "skybox_0" +
+        std::to_string(option + 1) + '/'};
+    static const std::vector<std::string> tex_faces {skybox_path + "right.jpg",
+        skybox_path + "left.jpg", skybox_path + "top.jpg", skybox_path +
+            "bottom.jpg", skybox_path + "back.jpg", skybox_path + "front.jpg"};
+    const auto tex_cubemap = make_cubemap(tex_faces);
+    // loading container
+    auto tex_object = load_texture(tex_path + "container.jpg");
+    if (option > 0)
+        tex_object = tex_cubemap;
 
-    const auto num_tex = tex_imgs.size();
-    std::vector<GLuint> textures(num_tex);
-    for (std::size_t i {0}; i < num_tex - 1; ++i)
-        textures[i] = load_texture(tex_imgs[i]);
-    // grass object requires using alpha blending
-    textures[num_tex - 1] = load_texture(tex_imgs[num_tex - 1], true);
-
-    static Shader obj_shader;
-    switch (option) {
-        case 1:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "blend_test_01.frag"};
-            break;
-        case 0:
-        default:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_01.frag"};
-    }
-
-    game_loop(win, VAO_vec, textures, {verts[0].size() / stride,
-            verts[1].size() / stride, verts[2].size() / stride}, obj_shader,
-            option);
+    game_loop(win, VAO_vec, {tex_cubemap, tex_object}, option);
 }
 
-// main loop for drawing light objects
+// main loop function
 void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
-        const std::vector<GLuint> &tex_maps,
-        const std::vector<size_t> &num_verts, const Shader &shad,
-        const int option) {
+        const std::vector<GLuint> &tex_maps, const int option) {
+    static const auto obj_shader = shader_for_object(option);
+    static const Shader skybox_shader {shad_path + "cubemap_test_01.vs",
+        shad_path + "cubemap_test_01.frag"};
+    Model m {model_path + "crysis_nanosuit_refl/nanosuit.obj"};
+
     const auto win_asp = window_aspect_ratio(win);
-
-    static auto blend_pos = blend_positions();
-    static std::vector<std::vector<glm::vec3>> poses {cubes_positions(),
-        {glm::vec3{0, 0, 0}}, blend_pos};
-
     while (!glfwWindowShouldClose(win)) {
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;
@@ -509,30 +626,23 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
 
         glfwPollEvents();
         do_movement();
-        glClearColor(0.15, 0.15, 0.15, 1);
+
+        // Bind to framebuffer and draw to color texture
+        glClearColor(0.2, 0.2, 0.2, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        const auto view = main_cam.view_matrix();
         const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
                 100.0f);
-
-        if (option == 3) { // sorting the positions of the objects
-            std::map<float, glm::vec3> sorted_pos;
-            for (size_t i {0}; i < blend_pos.size(); ++i)
-                sorted_pos[glm::length(main_cam.pos() - blend_pos[i])] =
-                    blend_pos[i];
-            blend_pos.clear();
-            // insert into the vector in the reversed order
-            for (auto it = sorted_pos.rbegin(); it != sorted_pos.rend(); ++it)
-                blend_pos.push_back(it->second);
-            poses[2] = blend_pos;
-        }
-
-        for (size_t i {0}; i < num_verts.size(); ++i)
-            for (size_t j {0}; j < poses[i].size(); ++j)
-                draw_object(shad, VAO[i], tex_maps[i], view, proj,
-                        glm::translate(glm::mat4{}, poses[i][j]),
-                        num_verts[i]);
+        const auto view = main_cam.view_matrix();
+        if (option == 0 || option == 1 || option == 3)
+            draw_object(obj_shader, VAO[1], tex_maps[1], view, proj,
+                    glm::mat4{}, 36, option);
+        else
+            draw_model(m, obj_shader, tex_maps[0], view, proj, glm::mat4{},
+                    option);
+        // avoid translation for the skybox
+        draw_skybox(skybox_shader, VAO[0], tex_maps[0],
+                glm::mat4{glm::mat3{main_cam.view_matrix()}}, proj);
 
         glfwSwapBuffers(win);
     }
@@ -541,7 +651,7 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
 // drawing an object
 void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
         const glm::mat4 &view, const glm::mat4 &proj, const glm::mat4 &mod,
-        const GLuint num_verts) {
+        const GLuint num_verts, const int option) {
     shad.use();
     const auto idx = shad.id();
 
@@ -551,12 +661,66 @@ void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
             glm::value_ptr(proj));
     glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
             glm::value_ptr(mod));
+    if (option > 0)
+        glUniform3f(glGetUniformLocation(idx, "cam_pos"), main_cam.pos().x,
+                main_cam.pos().y, main_cam.pos().z);
 
     glBindVertexArray(VAO);
-    glBindTexture(GL_TEXTURE_2D, tex_map);
+    if (option > 0)
+        glBindTexture(GL_TEXTURE_CUBE_MAP, tex_map);
+    else
+        glBindTexture(GL_TEXTURE_2D, tex_map);
 
     glDrawArrays(GL_TRIANGLES, 0, num_verts);
 
     glBindVertexArray(0);
+}
+
+// drawing the skybox
+void draw_skybox(const Shader &shad, const GLuint VAO, const GLuint tex_map,
+        const glm::mat4 &view, const glm::mat4 &proj) {
+    glDepthFunc(GL_LEQUAL);
+
+    shad.use();
+    const auto idx = shad.id();
+
+    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
+            glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
+            glm::value_ptr(proj));
+
+    glBindVertexArray(VAO);
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(idx, "tex_cubemap"), 0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, tex_map);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
+
+    glDepthFunc(GL_LESS);
+}
+
+// drawing a model
+void draw_model(Model& m, const Shader &shad, const GLuint tex_map,
+        const glm::mat4 &view, const glm::mat4 &proj, const glm::mat4 &mod,
+        const int option) {
+    shad.use();
+    const auto idx = shad.id();
+
+    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
+            glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
+            glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
+            glm::value_ptr(mod));
+    glUniform3f(glGetUniformLocation(idx, "cam_pos"), main_cam.pos().x,
+            main_cam.pos().y, main_cam.pos().z);
+
+    if (option == 5) {
+        glActiveTexture(GL_TEXTURE3);
+        glUniform1i(glGetUniformLocation(idx, "tex_cubemap"), 3);
+    }
+    glBindTexture(GL_TEXTURE_CUBE_MAP, tex_map);
+
+    m.draw(shad);
 }
 
