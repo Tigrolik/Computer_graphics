@@ -44,10 +44,10 @@ void Camera::process_keyboard(const Camera::Movement dir,const GLfloat dt) {
             cam_pos_ -= cam_front_ * vel;
             break;
         case left_dir:
-            cam_pos_.x -= cam_right_.x * vel;
+            cam_pos_ -= glm::normalize(glm::cross(cam_front_, cam_up_)) * vel;
             break;
         case right_dir:
-            cam_pos_.x += cam_right_.x * vel;
+            cam_pos_ += glm::normalize(glm::cross(cam_front_, cam_up_)) * vel;
             break;
         case up_dir:
             cam_pos_.y += cam_right_.x * vel;
@@ -82,6 +82,13 @@ void Camera::process_scroll(const GLfloat y_offset) {
         zoom_ = 1;
     else
         zoom_ = 45;
+}
+
+// set the angles for the rear view
+void Camera::rear_view() {
+    yaw_ang_ = -yaw_ang_;
+    pitch_ang_ = -pitch_ang_;
+    update_camera_vectors();
 }
 
 // using Euler angles to calculate camera front, right and up vectors

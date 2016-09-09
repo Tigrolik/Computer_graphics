@@ -70,15 +70,19 @@ Mesh Model::process_mesh(aiMesh* mesh_p, const aiScene* scene) {
             inds.push_back(face.mIndices[j]);
     }
     // materials
-    if (int(mesh_p->mMaterialIndex) >= 0) {
-        aiMaterial* mater = scene->mMaterials[mesh_p->mMaterialIndex];
-        const std::vector<Texture> diffuse_maps {load_material_textures(mater,
-                aiTextureType_DIFFUSE, "texture_diffuse")};
-        texs.insert(texs.end(), diffuse_maps.begin(), diffuse_maps.end());
-        const std::vector<Texture> specular_maps {load_material_textures(mater,
-                aiTextureType_SPECULAR, "texture_specular")};
-        texs.insert(texs.end(), specular_maps.begin(), specular_maps.end());
-    }
+    aiMaterial* mater = scene->mMaterials[mesh_p->mMaterialIndex];
+    // diffuse part
+    const std::vector<Texture> diffuse_maps {load_material_textures(mater,
+            aiTextureType_DIFFUSE, "texture_diffuse")};
+    texs.insert(texs.end(), diffuse_maps.begin(), diffuse_maps.end());
+    // specular part
+    const std::vector<Texture> specular_maps {load_material_textures(mater,
+            aiTextureType_SPECULAR, "texture_specular")};
+    texs.insert(texs.end(), specular_maps.begin(), specular_maps.end());
+    // reflection part
+    const std::vector<Texture> reflect_maps {load_material_textures(mater,
+            aiTextureType_AMBIENT, "texture_reflection")};
+    texs.insert(texs.end(), reflect_maps.begin(), reflect_maps.end());
 
     return Mesh {verts, inds, texs};
 }

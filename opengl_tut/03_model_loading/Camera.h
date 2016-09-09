@@ -48,6 +48,9 @@ public:
     void process_mouse_move(const GLfloat, const GLfloat,
             const GLboolean = true);
     void process_scroll(const GLfloat);
+    void reverse_yaw() { yaw_ang_ = -yaw_ang_; }
+    void reverse_pitch() { pitch_ang_ = -pitch_ang_; }
+    void rear_view();
 
 private:
     // attributes

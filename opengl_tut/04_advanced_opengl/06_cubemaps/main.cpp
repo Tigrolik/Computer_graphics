@@ -638,8 +638,9 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
             draw_object(obj_shader, VAO[1], tex_maps[1], view, proj,
                     glm::mat4{}, 36, option);
         else
-            draw_model(m, obj_shader, tex_maps[0], view, proj, glm::mat4{},
-                    option);
+            draw_model(m, obj_shader, tex_maps[0], view, proj,
+                    glm::scale(glm::translate(glm::mat4{},
+                            glm::vec3{0, -1.75, 0}), glm::vec3{0.2}), option);
         // avoid translation for the skybox
         draw_skybox(skybox_shader, VAO[0], tex_maps[0],
                 glm::mat4{glm::mat3{main_cam.view_matrix()}}, proj);

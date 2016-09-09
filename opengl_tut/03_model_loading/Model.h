@@ -8,7 +8,8 @@ GLuint texture_from_file(const std::string&, const std::string&);
 
 class Model {
 public:
-    Model(const std::string&);
+    explicit Model() = default;
+    explicit Model(const std::string&);
 
     void draw(const Shader&);
 

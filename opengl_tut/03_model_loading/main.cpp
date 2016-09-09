@@ -316,11 +316,11 @@ void set_dir_light(const GLuint idx, const int option) {
     switch (option) {
         case 1:
             glUniform3f(glGetUniformLocation(idx, "dir_light.ambient"),
-                    0.1, 0.1, 0.1);
+                    0.4, 0.4, 0.4);
             glUniform3f(glGetUniformLocation(idx, "dir_light.diffuse"),
-                    0.1, 0.1, 0.1);
+                    0.6, 0.6, 0.6);
             glUniform3f(glGetUniformLocation(idx, "dir_light.specular"),
-                    0.1, 0.1, 0.1);
+                    0.3, 0.3, 0.3);
             break;
         default:
             glUniform3f(glGetUniformLocation(idx, "dir_light.ambient"),

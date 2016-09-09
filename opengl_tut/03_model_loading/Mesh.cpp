@@ -11,7 +11,7 @@ Mesh::Mesh(const std::vector<Vertex>& verts, const std::vector<GLuint>& inds,
 
 // drawing method
 void Mesh::draw(const Shader& shad) {
-    GLuint diffuse_idx {0}, specular_idx {0};
+    GLuint diffuse_idx {0}, specular_idx {0}, reflect_idx {0};
     for (GLuint i {0}; i < textures_.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
         const std::string tex_type {textures_[i].type};
@@ -20,9 +20,12 @@ void Mesh::draw(const Shader& shad) {
             uni_str = tex_type + std::to_string(++diffuse_idx);
         else if (tex_type == "texture_specular")
             uni_str = tex_type + std::to_string(++specular_idx);
+        else if (tex_type == "texture_reflection")
+            uni_str = tex_type + std::to_string(++reflect_idx);
         glUniform1f(glGetUniformLocation(shad.id(), uni_str.c_str()), i);
         glBindTexture(GL_TEXTURE_2D, textures_[i].id);
     }
+    glActiveTexture(GL_TEXTURE0);
 
     // set default shininess
     glUniform1f(glGetUniformLocation(shad.id(), "shininess"), 16);
@@ -46,7 +49,6 @@ void Mesh::setup() {
     glGenBuffers(1, &EBO_);
 
     glBindVertexArray(VAO_);
-
     glBindBuffer(GL_ARRAY_BUFFER, VBO_);
     glBufferData(GL_ARRAY_BUFFER, size_of_elements(vertices_), &vertices_[0],
             GL_STATIC_DRAW);
