@@ -1,14 +1,20 @@
 /*
  * Following tutorial on OpenGL (materials):
  *
- * http://learnopengl.com/#!Advanced-OpenGL/Depth-testing
+ * http://learnopengl.com/#!Advanced-OpenGL/Geometry-Shader
  *
- * Depth options demonstration
+ * Demonstration of geometry shaders:
+ *     - drawing objects
+ *     - "exploding" model and drawing its normal vectors
+ *
+ * The Shader class has been modified:
+ *     - added two constructors to accept three files
  *
  */
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include <functional>
 #include <stdexcept>
 #include <cassert>
@@ -24,10 +30,12 @@
 
 #include "../../classes/Shader.h"
 #include "../../classes/Camera.h"
+#include "../../classes/Model.h"
 
 // paths to the folder where we keep shaders and textures: global vars
 static const std::string shad_path {"../../shaders/"};
 static const std::string tex_path {"../../images/"};
+static const std::string model_path {"../../models/"};
 
 // tracking which keys have been pressed/released (for smooth movement)
 static bool keys[1024];
@@ -58,30 +66,38 @@ void scroll_callback(GLFWwindow*, const double, const double);
 void do_movement();
 // cleaning up
 int clean_up(const int);
-// generate VAO, VBO, EBO...
+
+// generate VAO and VBOs
 void gen_objects(std::vector<GLuint>*, std::vector<GLuint>*);
-// bind the objects with vertex data
 void make_objects(const GLuint, const GLuint, const std::vector<GLfloat>&,
-        const bool, const int, const GLuint);
+        const GLuint, const GLuint, const bool = false);
 
-// init textures
-void gen_textures(std::vector<GLuint>&);
-void make_textures(const GLuint, const std::string&,
-        const GLenum, const GLenum);
+// four points
+std::vector<GLfloat> points_01();
+// four points with color components
+std::vector<GLfloat> points_02();
 
+// get shader depending of the option value
+Shader choose_shader(const int = 0);
+// draw objects with points
+void draw_objects(const Shader&, const GLuint, const GLuint = 4);
+// draw four green houses
+void draw_green_houses(const Shader&, const GLuint);
+// drawing a model
+void draw_model(Model&, const Shader&, const glm::mat4&, const glm::mat4&,
+        const glm::mat4&, const int);
+// drawing loop
+void game_loop(GLFWwindow*, const int = 0);
 // drawing objects
-void depth_test(GLFWwindow*, const int = 0);
-void draw_objects(GLFWwindow*, const std::vector<GLfloat>&,
-        const std::vector<GLfloat>&, const int = 0);
-void draw_object(const Shader&, const GLuint, const GLuint, const glm::mat4&,
-        const glm::mat4&, const glm::mat4&, const GLuint);
-void game_loop(GLFWwindow*, const std::vector<GLuint>&,
-        const std::vector<GLuint>&, const std::vector<size_t>&,
-        const Shader&, const int);
+void game_loop_objects(GLFWwindow*, const int, const Shader&);
+// drawing model
+void game_loop_model(GLFWwindow*, const int, const Shader&);
 
+// function to compute aspect ratio of screen's width and height
+float window_aspect_ratio(GLFWwindow*);
 // function to compute sizeof elements lying in the vector container
 template <class T>
-constexpr size_t size_of_elements(const std::vector<T> &v) {
+constexpr size_t size_in_bytes(const std::vector<T>& v) {
     return v.size() * sizeof(T);
 }
 
@@ -100,11 +116,12 @@ int main(int argc, char *argv[]) try {
 
     std::cout <<
         "----------------------------------------------------------------\n" <<
-        "This program demonstrates various depth options:\n" <<
+        "This program demonstrates the use of geometry shaders:\n" <<
         "keys A/D, left/right arrow keys control side camera movement\n" <<
         "up/down arrow keys - up and down, W/S - depth\n" <<
         "mouse can also be used to change view/zoom (scroll)\n" <<
         "----------------------------------------------------------------\n";
+
 
     if (argc > 1)
         process_input(win, argv[1]);
@@ -133,26 +150,10 @@ void process_input(GLFWwindow *win, const std::string &inp) {
     const std::string s {inp};
     const char inp_char {s[0]};
     if (s.length() == 1 && inp_char >= '0' && inp_char < num_options) {
-        switch (inp_char - '0') {
-            case 4:
-                depth_test(win, 4);
-                break;
-            case 3:
-                depth_test(win, 3);
-                break;
-            case 2:
-                depth_test(win, 2);
-                break;
-            case 1:
-                depth_test(win, 1);
-                break;
-            case 0:
-            default:
-                depth_test(win, 0);
-        }
+        game_loop(win, inp_char - '0');
     } else {
         std::cerr << "Wrong input: drawing default scene\n";
-        depth_test(win, 0);
+        game_loop(win, 0);
     }
 }
 
@@ -162,12 +163,12 @@ void process_input(GLFWwindow *win, const std::string &inp) {
 void show_menu(GLFWwindow *win, const std::string &prog_name) {
     std::cout << "Note: the program can be run as follows:\n" <<
         prog_name << " int_param, where int_param is:\n" <<
-        "0:\tcube on a floor with depth: GL_LESS (default)\n" <<
-        "1:\tcube on a floor with depth: GL_ALWAYS\n" <<
-        "2:\tcube on a floor with depth: GL_NOTEQUAL\n" <<
-        "3:\tdepth buffer (white)\n" <<
-        "4:\tdepth buffer (dark)\n";
-    depth_test(win, 0);
+        "0:\tfour big green dots (default)\n" <<
+        "1:\tfour green houses (two in wireframe mode)\n" <<
+        "2:\tfour color houses\n" <<
+        "3:\t\"exploding\" crisis nanosuit\n" <<
+        "4:\tcrisis nanosuit with normal vectors\n";
+    game_loop(win, 0);
 }
 
 /*
@@ -185,8 +186,8 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     // create a window object
-    GLFWwindow *win = glfwCreateWindow(w, h, "Depth testing", nullptr,
-            nullptr);
+    GLFWwindow *win = glfwCreateWindow(w, h, "Geometry Shader",
+            nullptr, nullptr);
     if (win == nullptr)
         throw std::runtime_error {"Failed to create GLFW window"};
 
@@ -208,10 +209,20 @@ GLFWwindow* init(const GLuint w, const GLuint h) {
     // inform OpenGL about the size of the rendering window
     glViewport(0, 0, w, h);
 
-    // enable depth testing for nice 3D output
+    // allow modifying the size of pixel
+    glEnable(GL_PROGRAM_POINT_SIZE);
+
+    // enable the depth test
     glEnable(GL_DEPTH_TEST);
 
     return win;
+}
+
+// function to calculate aspect ratio of screen's width and height
+float window_aspect_ratio(GLFWwindow *win) {
+    int win_w, win_h;
+    glfwGetFramebufferSize(win, &win_w, &win_h);
+    return float(win_w) / win_h;
 }
 
 /*
@@ -294,219 +305,176 @@ void gen_objects(std::vector<GLuint> *VAO_vec, std::vector<GLuint> *VBO_vec) {
  * Binding objects with vertex data.
  */
 void make_objects(const GLuint VAO, const GLuint VBO,
-        const std::vector<GLfloat> &vertices, const GLuint stride) {
+        const std::vector<GLfloat> &vertices, const GLuint stride,
+        const GLuint offset, const bool second_attr) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, size_of_elements(vertices), vertices.data(),
+    glBufferData(GL_ARRAY_BUFFER, size_in_bytes(vertices), vertices.data(),
             GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)0);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
+            0);
 
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat),
-            (GLvoid*)(3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
+    if (second_attr) {
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                stride * sizeof(GLfloat), (GLvoid*)(offset * sizeof(GLfloat)));
+    }
+
     glBindVertexArray(0);
 }
 
-// exploiting std::vector to initialize several textures
-void gen_textures(std::vector<GLuint> &tex) {
-    for (auto &x: tex)
-        glGenTextures(1, &x);
-}
-
-/*
- * Binding textures with the image data
- */
-void make_textures(const GLuint tex, const std::string& img_fn,
-        const std::vector<GLenum> &wrap, const std::vector<GLenum> &filter) {
-    int img_w, img_h;
-    unsigned char *img = SOIL_load_image(img_fn.c_str(), &img_w, &img_h, 0,
-            SOIL_LOAD_RGB);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img_w, img_h, 0, GL_RGB,
-            GL_UNSIGNED_BYTE, img);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(img);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap[0]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap[1]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter[0]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter[1]);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-// draw a box on a floor
-void depth_test(GLFWwindow *win, const int option) {
-    static const std::vector<GLfloat> cube_verts {
-        // pos          tex coords
-        -0.5, -0.5, -0.5,  0, 0,
-         0.5, -0.5, -0.5,  1, 0,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5,  0.5, -0.5,  1, 1,
-        -0.5,  0.5, -0.5,  0, 1,
-        -0.5, -0.5, -0.5,  0, 0,
-        -0.5, -0.5,  0.5,  0, 0,
-         0.5, -0.5,  0.5,  1, 0,
-         0.5,  0.5,  0.5,  1, 1,
-         0.5,  0.5,  0.5,  1, 1,
-        -0.5,  0.5,  0.5,  0, 1,
-        -0.5, -0.5,  0.5,  0, 0,
-        -0.5,  0.5,  0.5,  1, 0,
-        -0.5,  0.5, -0.5,  1, 1,
-        -0.5, -0.5, -0.5,  0, 1,
-        -0.5, -0.5, -0.5,  0, 1,
-        -0.5, -0.5,  0.5,  0, 0,
-        -0.5,  0.5,  0.5,  1, 0,
-         0.5,  0.5,  0.5,  1, 0,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5,  0.5,  0, 0,
-         0.5,  0.5,  0.5,  1, 0,
-        -0.5, -0.5, -0.5,  0, 1,
-         0.5, -0.5, -0.5,  1, 1,
-         0.5, -0.5,  0.5,  1, 0,
-         0.5, -0.5,  0.5,  1, 0,
-        -0.5, -0.5,  0.5,  0, 0,
-        -0.5, -0.5, -0.5,  0, 1,
-        -0.5,  0.5, -0.5,  0, 1,
-         0.5,  0.5, -0.5,  1, 1,
-         0.5,  0.5,  0.5,  1, 0,
-         0.5,  0.5,  0.5,  1, 0,
-        -0.5,  0.5,  0.5,  0, 0,
-        -0.5,  0.5, -0.5,  0, 1
+// four points
+std::vector<GLfloat> points_01() {
+    return std::vector<GLfloat> {
+        -0.5,  0.5, // top-left
+         0.5,  0.5, // top-right
+         0.5, -0.5, // bottom-right
+        -0.5, -0.5  // bottom-left
     };
-
-    static const std::vector<GLfloat> floor_verts {
-         // pos        tex coords
-         5,  -0.5,  5,  2, 0,
-        -5,  -0.5,  5,  0, 0,
-        -5,  -0.5, -5,  0, 2,
-         5,  -0.5,  5,  2, 0,
-        -5,  -0.5, -5,  0, 2,
-         5,  -0.5, -5,  2, 2
-    };
-
-    draw_objects(win, cube_verts, floor_verts, option);
 }
 
-// helper function to draw lighting objects
-void draw_objects(GLFWwindow *win, const std::vector<GLfloat> &cube_verts,
-        const std::vector<GLfloat> &floor_verts, const int option) {
+// four points with color components
+std::vector<GLfloat> points_02() {
+    return std::vector<GLfloat> {
+        -0.5,  0.5, 1, 0, 0, // top-left
+         0.5,  0.5, 0, 1, 0, // top-right
+         0.5, -0.5, 0, 0, 1, // bottom-right
+        -0.5, -0.5, 1, 1, 0 // bottom-left
+    };
+}
 
-    Shader obj_shader;
+// get shader depending of the option value
+Shader choose_shader(const int option) {
     switch (option) {
         case 4:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_03.frag"};
-            break;
+            return Shader {shad_path + "geom_04.vs", shad_path + "geom_05.geom",
+                    shad_path + "ubo_yellow_01.frag"};
         case 3:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_02.frag"};
-            break;
-        default:
-            obj_shader = Shader {shad_path + "depth_test_01.vs",
-                shad_path + "depth_test_01.frag"};
-    }
-
-    std::vector<std::string> tex_imgs {{tex_path + "pattern4diffuseblack.jpg"},
-        {tex_path + "metal.png"}};
-
-    GLuint VAO_cube {}, VAO_floor {}, VBO_cube {}, VBO_floor {};
-
-    // VAOs and VBOs
-    std::vector<GLuint> VAO_vec {VAO_cube, VAO_floor};
-    std::vector<GLuint> VBO_vec {VBO_cube, VBO_floor};
-
-    const GLuint stride = 5;
-    gen_objects(&VAO_vec, &VBO_vec);
-    make_objects(VAO_vec[0], VBO_vec[0], cube_verts, stride);
-    make_objects(VAO_vec[1], VBO_vec[1], floor_verts, stride);
-
-    // texture
-    const auto num_tex = tex_imgs.size();
-    std::vector<GLuint> textures(num_tex);
-    gen_textures(textures);
-    for (size_t i {0}; i < num_tex; ++i)
-        make_textures(textures[i], tex_imgs[i], {GL_REPEAT, GL_REPEAT},
-                {GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR});
-
-    //for (std::size_t i {0}; i < num_tex; ++i)
-    //    textures[i] = load_texture(tex_imgs[i], false);
-
-    const std::vector<size_t> num_verts {cube_verts.size() / stride,
-        floor_verts.size() / stride};
-
-    game_loop(win, VAO_vec, textures, num_verts, obj_shader, option);
-}
-
-// main loop for drawing light objects
-void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
-        const std::vector<GLuint> &tex_maps,
-        const std::vector<size_t> &num_verts, const Shader &shad,
-        const int option) {
-    int win_w, win_h;
-    glfwGetFramebufferSize(win, &win_w, &win_h);
-    const auto win_asp = float(win_w) / win_h;
-
-    glDepthMask(GL_TRUE);
-    switch (option) {
+            return Shader {shad_path + "geom_03.vs", shad_path + "geom_04.geom",
+                shad_path + "model_loading_01.frag"};
         case 2:
-            glDepthFunc(GL_NOTEQUAL);
-            break;
+            return Shader {shad_path + "geom_02.vs",
+                shad_path + "geom_03.geom", shad_path + "geom_01.frag"};
         case 1:
-            glDepthFunc(GL_ALWAYS);
-            break;
+            return Shader {shad_path + "geom_01.vs",
+                shad_path + "geom_02.geom", shad_path + "ubo_green_01.frag"};
         case 0:
         default:
-            glDepthFunc(GL_LESS);
+            return Shader {shad_path + "geom_01.vs",
+                shad_path + "geom_01.geom", shad_path + "ubo_green_01.frag"};
     }
+}
 
-    glClearColor(0.15, 0.15, 0.15, 1);
+// draw objects with geometry shader defined by points
+void draw_objects(const Shader& shad, const GLuint VAO, const GLuint num_p) {
+    shad.use();
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_POINTS, 0, num_p);
+    glBindVertexArray(0);
+}
+
+// draw four green houses: two are in wireframe mode
+void draw_green_houses(const Shader& shad, const GLuint VAO) {
+    shad.use();
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_POINTS, 0, 1);
+    glDrawArrays(GL_POINTS, 3, 1);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glDrawArrays(GL_POINTS, 1, 2);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glBindVertexArray(0);
+}
+
+// main drawing loop
+void game_loop(GLFWwindow* win, const int option) {
+    if (option < 3)
+        game_loop_objects(win, option, choose_shader(option));
+    else
+        game_loop_model(win, option, choose_shader(option));
+}
+
+// loop for drawing objects
+void game_loop_objects(GLFWwindow* win, const int option, const Shader& shad) {
+    constexpr auto num_obj = 1;
+    std::vector<GLuint> VAO_vec (num_obj);
+    std::vector<GLuint> VBO_vec (num_obj);
+    gen_objects(&VAO_vec, &VBO_vec);
+
+    if (option < 2)
+        make_objects(VAO_vec[0], VBO_vec[0], points_01(), 2, 2);
+    else
+        make_objects(VAO_vec[0], VBO_vec[0], points_02(), 5, 2, true);
+
     while (!glfwWindowShouldClose(win)) {
-        const auto curr_time = glfwGetTime();
-        delta_frame_time = curr_time - last_frame_time;
-        last_frame_time  = curr_time;
         glfwPollEvents();
-        do_movement();
+
+        glClearColor(0.2, 0.2, 0.2, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        const auto view = main_cam.view_matrix();
-        const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
-                100.0f);
-        draw_object(shad, VAO[0], tex_maps[0], view, proj,
-                glm::translate(glm::mat4{}, glm::vec3{-1, 0, -1}),
-                num_verts[0]);
-        draw_object(shad, VAO[1], tex_maps[1], view, proj,
-                glm::translate(glm::mat4{}, glm::vec3{2, 0, 0}),
-                num_verts[1]);
+
+        if (option == 1)
+            draw_green_houses(shad, VAO_vec[0]);
+        else
+            draw_objects(shad, VAO_vec[0], 4);
 
         glfwSwapBuffers(win);
     }
 }
 
-// drawing an object
-void draw_object(const Shader &shad, const GLuint VAO, const GLuint tex_map,
-        const glm::mat4 &view, const glm::mat4 &proj, const glm::mat4 &mod,
-        const GLuint num_verts) {
+// loop for drawing the model
+void game_loop_model(GLFWwindow* win, const int option, const Shader& shad) {
+
+    if (option == 9)
+        std::cout << "wtf\n";
+
+    Model m {model_path + "crysis_nanosuit_refl/nanosuit.obj"};
+
+    const auto win_asp = window_aspect_ratio(win);
+
+    while (!glfwWindowShouldClose(win)) {
+        const auto curr_time = glfwGetTime();
+        delta_frame_time = curr_time - last_frame_time;
+        last_frame_time  = curr_time;
+
+        glfwPollEvents();
+        do_movement();
+
+        glClearColor(0.2, 0.2, 0.2, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        const auto proj = glm::perspective(main_cam.zoom(), win_asp, 0.1f,
+                100.0f);
+        const auto view = main_cam.view_matrix();
+        const auto mat_mod = glm::scale(glm::translate(glm::mat4{},
+                    glm::vec3{0, -8.2, -12}), glm::vec3{1.1});
+
+        if (option == 4)
+            draw_model(m, Shader {shad_path + "model_loading_01.vs", shad_path
+                    + "model_loading_01.frag"}, proj, view, mat_mod, option);
+        draw_model(m, shad, proj, view, mat_mod, option);
+
+        glfwSwapBuffers(win);
+    }
+}
+
+// drawing the model
+void draw_model(Model& m, const Shader& shad, const glm::mat4& proj,
+        const glm::mat4& view, const glm::mat4& mat_mod, const int option) {
     shad.use();
     const auto idx = shad.id();
 
-    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
-            glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
             glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
+            glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
-            glm::value_ptr(mod));
+            glm::value_ptr(mat_mod));
 
-    glBindVertexArray(VAO);
-    glBindTexture(GL_TEXTURE_2D, tex_map);
+    if (option == 3)
+        glUniform1f(glGetUniformLocation(idx, "time_value"), glfwGetTime());
 
-    glDrawArrays(GL_TRIANGLES, 0, num_verts);
-
-    glBindVertexArray(0);
+    m.draw(shad);
 }
 

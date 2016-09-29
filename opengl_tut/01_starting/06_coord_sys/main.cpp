@@ -20,7 +20,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Shader.h"
+#include "../../classes/Shader.h"
 
 // path to the folder where we keep shaders and textures
 static const std::string shad_path {"../../shaders/"};

@@ -18,8 +18,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Camera.h"
-#include "Model.h"
+#include "../classes/Camera.h"
+#include "../classes/Model.h"
 
 // paths to the folder where we keep shaders, textures and models: global vars
 static const std::string shad_path {"../shaders/"};
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) try {
         "----------------------------------------------------------------\n";
 
     // draw model
-    Model nanosuit_model {model_path + "crysis_nanosuit/nanosuit.obj"};
+    Model nanosuit_model {model_path + "crysis_nanosuit_refl/nanosuit.obj"};
 
     if (argc > 1)
         process_input(win, nanosuit_model, argv[1]);
@@ -284,7 +284,7 @@ void game_loop(GLFWwindow *win, Model& model, const Shader& shad,
         if (option > 0) {
             set_dir_light(idx, option);
             set_point_lights(idx, lamps_pos, option);
-            //set_spot_light(idx, option);
+            set_spot_light(idx, option);
         }
 
         // matrices
@@ -365,9 +365,9 @@ void set_spot_light(const GLuint idx, const int option) {
     switch (option) {
         case 1:
             glUniform3f(glGetUniformLocation(idx, "spot_light.diffuse"),
-                    0.8, 0.8, 0.8);
+                    0.0, 0.0, 0.0);
             glUniform3f(glGetUniformLocation(idx, "spot_light.specular"),
-                    0.8, 0.8, 0.8);
+                    0.0, 0.0, 0.0);
             break;
         default:
             glUniform3f(glGetUniformLocation(idx, "spot_light.diffuse"),
@@ -395,7 +395,7 @@ void draw_lamp(const Shader &shad, const GLuint VAO, const glm::mat4 &view,
     glUniform3f(glGetUniformLocation(idx, "lamp_color"),
             lamp_color.x, lamp_color.y, lamp_color.z);
 
-    const glm::mat4 model = glm::scale(glm::translate(glm::mat4{}, lamp_pos),
+    const glm::mat4 mod = glm::scale(glm::translate(glm::mat4{}, lamp_pos),
             glm::vec3{0.2});
 
     glUniformMatrix4fv(glGetUniformLocation(idx, "view"), 1, GL_FALSE,
@@ -403,7 +403,7 @@ void draw_lamp(const Shader &shad, const GLuint VAO, const glm::mat4 &view,
     glUniformMatrix4fv(glGetUniformLocation(idx, "proj"), 1, GL_FALSE,
             glm::value_ptr(proj));
     glUniformMatrix4fv(glGetUniformLocation(idx, "model"), 1, GL_FALSE,
-            glm::value_ptr(model));
+            glm::value_ptr(mod));
 
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);

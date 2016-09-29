@@ -13,7 +13,8 @@
 #include <algorithm>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "Shader.h"
+
+#include "../../classes/Shader.h"
 
 // path to the folder where we keep shaders
 static const std::string shad_path {"../../shaders/"};

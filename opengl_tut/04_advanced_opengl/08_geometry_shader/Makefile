@@ -21,7 +21,7 @@ RELEASE_FLAGS = -O3 -D NDEBUG
 
 # Flags for OpenGL
 LIBS = -lGL -lGLU -lGLEW -lGLEW -lglfw -lXxf86vm -ldl -lX11 -lpthread\
-	-lXrandr -lXi -lXinerama -lXcursor -lSOIL
+	-lXrandr -lXi -lXinerama -lXcursor -lSOIL -lassimp
 
 SOURCES := $(wildcard *.cpp)
 TARGET := main

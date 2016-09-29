@@ -20,7 +20,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Shader.h"
+#include "../../classes/Shader.h"
 
 // path to the folder where we keep shaders and textures
 static const std::string shad_path {"../../shaders/"};
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) try {
             argv[0] << " int_param, where int_param is:\n" <<
             "0:\trotating box (default)\n" <<
             "1:\tbox rotating around its corner\n" <<
-            "2:\ttow boxes (rotating vs scaled)\n";
+            "2:\ttwo boxes (rotating vs scaled)\n";
         rotating_container(win);
     }
     // clean up and exit properly

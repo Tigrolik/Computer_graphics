@@ -26,9 +26,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Shader.h"
-#include "Camera.h"
-#include "Model.h"
+#include "../../classes/Shader.h"
+#include "../../classes/Camera.h"
+#include "../../classes/Model.h"
 
 // paths to the folder where we keep shaders and textures: global vars
 static const std::string shad_path {"../../shaders/"};
