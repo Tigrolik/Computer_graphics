@@ -17,6 +17,13 @@ public:
     explicit Model() = default;
     explicit Model(const std::string&);
 
+    GLuint texture_id(const GLuint n) const { return textures_loaded_[n].id; };
+    GLuint num_meshes() const { return meshes_.size(); }
+    GLuint num_mesh_vertices(const GLuint n) const {
+        return meshes_[n].num_vertices();
+    }
+    GLuint mesh_vao(const GLuint n) const { return meshes_[n].vao(); }
+
     void draw(const Shader&);
 
 private:

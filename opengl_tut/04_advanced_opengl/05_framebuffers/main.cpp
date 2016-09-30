@@ -547,13 +547,13 @@ std::vector<GLfloat> quad_vertices() {
 std::vector<GLfloat> mirror_quad_vertices() {
     return std::vector<GLfloat> {
         // pos      tex coords
-        -0.3f, 1.0f, 0, 1,
-        -0.3f, 0.7f, 0, 0,
-         0.3f, 0.7f, 1, 0,
+        -0.3,   1, 1, 1,
+        -0.3, 0.7, 1, 0,
+         0.3, 0.7, 0, 0,
 
-        -0.3f, 1.0f, 0, 1,
-         0.3f, 0.7f, 1, 0,
-         0.3f, 1.0f, 1, 1
+        -0.3,   1, 1, 1,
+         0.3, 0.7, 0, 0,
+         0.3,   1, 0, 1
     };
 }
 
@@ -621,7 +621,6 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
         const auto curr_time = glfwGetTime();
         delta_frame_time = curr_time - last_frame_time;
         last_frame_time  = curr_time;
-
         glfwPollEvents();
         do_movement();
 
@@ -658,10 +657,8 @@ void game_loop(GLFWwindow *win, const std::vector<GLuint> &VAO,
                     glm::translate(glm::mat4{}, poses[i]), num_verts[0]);
 
         // draw the framebuffer
-        if (option == 6) // drawing with the rear view mirror
-            draw_framebuffer(frame_shader, VAO[3], tex_maps[2], num_verts[2]);
-        else
-            draw_framebuffer(frame_shader, VAO[2], tex_maps[2], num_verts[2]);
+        draw_framebuffer(frame_shader, VAO[option == 6 ? 3 : 2], tex_maps[2],
+                num_verts[2]);
 
         glfwSwapBuffers(win);
     }

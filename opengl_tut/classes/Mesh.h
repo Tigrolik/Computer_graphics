@@ -40,6 +40,9 @@ public:
     explicit Mesh(const std::vector<Vertex>&, const std::vector<GLuint>&,
             const std::vector<Texture>&);
 
+    GLuint vao() const { return VAO_; }
+    GLuint num_vertices() const { return vertices_.size(); }
+
     void draw(const Shader&);
 
 private:
