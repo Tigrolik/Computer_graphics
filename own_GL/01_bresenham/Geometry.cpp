@@ -107,7 +107,7 @@ double Triangle::length() const {
 double Triangle::area() const {
     const double d1 {p1_.dist_to(p2_)}, d2 {p2_.dist_to(p3_)};
     const double d3 {p3_.dist_to(p1_)}, s {0.5 * (d1 + d2 + d3)};
-    return sqrt(s * (s - d1) * (s - d2) * (s - d3));
+    return std::sqrt(s * (s - d1) * (s - d2) * (s - d3));
 }
 
 void Triangle::draw(PPM_Image &img, const PPM_Color &c) const {

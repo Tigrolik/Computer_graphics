@@ -19,6 +19,7 @@
 #define _GEOMETRY_H_
 
 #include <algorithm>
+#include <cmath>
 #include "PPM_Image.h"
 
 template <typename T>
@@ -49,7 +50,7 @@ public:
 
     double length() const override { return 0.0; }
     double area() const override { return 0.0; }
-    double dist_to(const Point &o) const { return sqrt(sqr_fun(x_ - o.x_) +
+    double dist_to(const Point &o) const { return std::sqrt(sqr_fun(x_ - o.x_) +
             sqr_fun(y_ - o.y_)); }
     void draw(PPM_Image&, const PPM_Color& = PPM_Color{255}) const override;
     void fill(PPM_Image&, const PPM_Color& = PPM_Color{255}) const override;
@@ -90,7 +91,7 @@ public:
     double length() const override;
     double area() const override;
     void draw(PPM_Image&, const PPM_Color& = PPM_Color{255}) const override;
-    void fill(PPM_Image&, const PPM_Color& = PPM_Color{255}) const;
+    void fill(PPM_Image&, const PPM_Color& = PPM_Color{255}) const override;
 
 private:
     Point p1_;
